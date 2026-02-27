@@ -531,10 +531,10 @@ function MessageBubble({ message, isLoading }: { message: Message; isLoading: bo
 
             {/* Restaurant cards - horizontal scroll */}
             {message.restaurants && message.restaurants.length > 0 && (
-              <div className="mt-2 -mr-4 md:-mr-6 h-[440px] md:h-[460px]">
+              <div className="mt-2 -mr-4 md:-mr-6 h-[360px] md:h-[420px]">
                 <div className="flex gap-3 overflow-x-auto overflow-y-hidden h-full pb-2 pr-4 md:pr-6 scrollbar-hide snap-x snap-mandatory">
                   {message.restaurants.map((restaurant, index) => (
-                    <div key={restaurant.id} className="flex-shrink-0 w-[280px] md:w-72 h-[420px] md:h-[440px] snap-start">
+                    <div key={restaurant.id} className="flex-shrink-0 w-[240px] md:w-72 h-[340px] md:h-[400px] snap-start">
                       <RestaurantCard
                         restaurant={restaurant}
                         index={index}

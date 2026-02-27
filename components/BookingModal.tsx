@@ -143,7 +143,7 @@ export default function BookingModal() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 p-4 md:p-4"
+        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
         onClick={(e) => e.target === e.currentTarget && step !== 'processing' && closeBookingModal()}
       >
         <motion.div
@@ -592,7 +592,9 @@ export default function BookingModal() {
                 disabled={!selectedTime}
                 className="w-full btn-primary py-3 text-base disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Continue to Payment
+                {bookingRestaurant?.depositPolicy && calculateDeposit(bookingRestaurant.depositPolicy, partySize) > 0
+                  ? 'Continue to Payment'
+                  : 'Continue'}
               </button>
               <p className="text-xs text-gray-400 text-center mt-3">
                 Free cancellation up to 24 hours before

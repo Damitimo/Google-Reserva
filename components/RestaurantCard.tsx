@@ -144,10 +144,10 @@ export default function RestaurantCard({ restaurant, index, compact = false }: R
       </div>
 
       {/* Content */}
-      <div className="p-3 flex-1 flex flex-col">
+      <div className="p-2.5 flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Name and Reviews */}
-        <div className="mb-2">
-          <h3 className="font-semibold text-gray-900 leading-tight">{restaurant.name}</h3>
+        <div className="mb-1.5">
+          <h3 className="font-semibold text-gray-900 leading-tight text-sm">{restaurant.name}</h3>
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <span>{restaurant.cuisine}</span>
             <span>•</span>
@@ -160,9 +160,9 @@ export default function RestaurantCard({ restaurant, index, compact = false }: R
           </div>
         </div>
 
-        {/* Price, Distance & Highlights */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex">
+        {/* Price, Distance & Highlights - 2 rows max on mobile */}
+        <div className="flex items-center gap-1.5 md:gap-2 flex-wrap max-h-[44px] md:max-h-none overflow-hidden md:overflow-visible">
+          <div className="flex flex-shrink-0">
             {Array.from({ length: 4 }).map((_, i) => (
               <DollarSign
                 key={i}
@@ -171,10 +171,30 @@ export default function RestaurantCard({ restaurant, index, compact = false }: R
             ))}
           </div>
           {restaurant.walkingTime && (
-            <div className="flex items-center text-gray-500 text-xs">
+            <div className="flex items-center text-gray-500 text-xs flex-shrink-0">
               <Clock className="w-3.5 h-3.5 mr-1" />
               <span>{restaurant.walkingTime} min</span>
             </div>
+          )}
+          {restaurant.depositPolicy && (
+            <>
+              <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">
+                {restaurant.depositPolicy.type === 'hold_only'
+                  ? 'Card hold req.'
+                  : restaurant.depositPolicy.type === 'per_person'
+                    ? `Deposit: $${restaurant.depositPolicy.amount}/person`
+                    : restaurant.depositPolicy.minPartySize
+                      ? `Deposit: $${restaurant.depositPolicy.amount} (${restaurant.depositPolicy.minPartySize}+ guests)`
+                      : `Deposit: $${restaurant.depositPolicy.amount}`}
+              </span>
+              <span className="relative group/info flex-shrink-0">
+                <Info className="w-3.5 h-3.5 text-gray-400 cursor-help hover:text-gray-600" />
+                <span className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded w-32 text-center opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible transition-opacity">
+                  Free cancellation 24hrs before
+                  <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                </span>
+              </span>
+            </>
           )}
           {restaurant.highlights.slice(0, 2).map((highlight, i) => (
             <span
@@ -184,44 +204,24 @@ export default function RestaurantCard({ restaurant, index, compact = false }: R
               {highlight}
             </span>
           ))}
-          {restaurant.depositPolicy && (
-            <>
-              <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">
-                {restaurant.depositPolicy.type === 'hold_only'
-                  ? 'Card hold req.'
-                  : restaurant.depositPolicy.type === 'per_person'
-                    ? `Deposit: $${restaurant.depositPolicy.amount}/person`
-                    : restaurant.depositPolicy.minPartySize
-                      ? `Deposit: $${restaurant.depositPolicy.amount} (${restaurant.depositPolicy.minPartySize}+)`
-                      : `Deposit: $${restaurant.depositPolicy.amount}`}
-              </span>
-              <span className="relative group/info">
-                <Info className="w-3.5 h-3.5 text-gray-400 cursor-help hover:text-gray-600" />
-                <span className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded w-32 text-center opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible transition-opacity">
-                  Free cancellation 24hrs before
-                  <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
-                </span>
-              </span>
-            </>
-          )}
         </div>
 
-        {/* Available Times */}
+        {/* Available Times - hidden on mobile */}
         {restaurant.availableTimes && restaurant.availableTimes.length > 0 && (
-          <div className="mt-auto pt-3">
-            <p className="text-xs text-gray-400 mb-1.5">Available tonight</p>
-            <div className="flex flex-wrap gap-1.5">
+          <div className="hidden md:block mt-auto pt-2">
+            <p className="text-xs text-gray-400 mb-1">Available tonight</p>
+            <div className="flex flex-wrap gap-1">
               {restaurant.availableTimes.slice(0, 4).map((time, i) => (
                 <button
                   key={i}
                   onClick={() => openBookingModal(restaurant)}
-                  className="px-2.5 py-1 bg-google-blue/10 text-google-blue text-xs font-medium rounded-lg hover:bg-google-blue/20 transition-colors"
+                  className="px-2 py-0.5 bg-google-blue/10 text-google-blue text-xs font-medium rounded-md hover:bg-google-blue/20 transition-colors"
                 >
                   {time}
                 </button>
               ))}
               {restaurant.availableTimes.length > 4 && (
-                <span className="px-2 py-1 text-gray-400 text-xs">
+                <span className="px-1.5 py-0.5 text-gray-400 text-xs">
                   +{restaurant.availableTimes.length - 4}
                 </span>
               )}
@@ -234,7 +234,7 @@ export default function RestaurantCard({ restaurant, index, compact = false }: R
       <div className="flex border-t border-gray-100 flex-shrink-0">
         <button
           onClick={handleMapClick}
-          className="flex-1 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1"
+          className="flex-1 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1"
         >
           <MapPin className="w-4 h-4" />
           Map
@@ -242,7 +242,7 @@ export default function RestaurantCard({ restaurant, index, compact = false }: R
         <div className="w-px bg-gray-100" />
         <button
           onClick={() => openBookingModal(restaurant)}
-          className="flex-1 py-2.5 text-sm text-google-blue font-medium hover:bg-blue-50 transition-colors"
+          className="flex-1 py-2 text-sm text-google-blue font-medium hover:bg-blue-50 transition-colors"
         >
           Reserve
         </button>
