@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import Chat from '@/components/Chat';
 import BookingModal from '@/components/BookingModal';
 import ReviewsModal from '@/components/ReviewsModal';
+import MapModal from '@/components/MapModal';
 
 // Dynamically import Map to avoid SSR issues with Google Maps
 const Map = dynamic(() => import('@/components/Map'), {
@@ -41,6 +42,9 @@ export default function Home() {
 
       {/* Reviews Modal */}
       <ReviewsModal />
+
+      {/* Map Modal (mobile) */}
+      <MapModal />
     </main>
   );
 }

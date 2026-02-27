@@ -38,6 +38,12 @@ interface AppStore {
   openReviewsModal: (restaurant: Restaurant) => void;
   closeReviewsModal: () => void;
   setReviewsSummary: (summary: string) => void;
+
+  // Map modal (for mobile)
+  showMapModal: boolean;
+  mapModalRestaurant: Restaurant | null;
+  openMapModal: (restaurant: Restaurant) => void;
+  closeMapModal: () => void;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -121,4 +127,12 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ showReviewsModal: false, reviewsRestaurant: null, reviewsSummary: null }),
   setReviewsSummary: (summary) =>
     set({ reviewsSummary: summary }),
+
+  // Map modal (for mobile)
+  showMapModal: false,
+  mapModalRestaurant: null,
+  openMapModal: (restaurant) =>
+    set({ showMapModal: true, mapModalRestaurant: restaurant }),
+  closeMapModal: () =>
+    set({ showMapModal: false, mapModalRestaurant: null }),
 }));

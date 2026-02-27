@@ -13,7 +13,16 @@ interface RestaurantCardProps {
 }
 
 export default function RestaurantCard({ restaurant, index, compact = false }: RestaurantCardProps) {
-  const { selectRestaurant, openBookingModal, openReviewsModal, mapState } = useAppStore();
+  const { selectRestaurant, openBookingModal, openReviewsModal, openMapModal, mapState } = useAppStore();
+
+  // Check if mobile (under md breakpoint)
+  const handleMapClick = () => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      openMapModal(restaurant);
+    } else {
+      selectRestaurant(restaurant);
+    }
+  };
   const isSelected = mapState.selectedRestaurant?.id === restaurant.id;
   const [photoIndex, setPhotoIndex] = useState(0);
 
@@ -224,7 +233,7 @@ export default function RestaurantCard({ restaurant, index, compact = false }: R
       {/* Actions */}
       <div className="flex border-t border-gray-100 flex-shrink-0">
         <button
-          onClick={() => selectRestaurant(restaurant)}
+          onClick={handleMapClick}
           className="flex-1 py-2.5 text-sm text-gray-600 hover:bg-gray-50 transition-colors flex items-center justify-center gap-1"
         >
           <MapPin className="w-4 h-4" />
