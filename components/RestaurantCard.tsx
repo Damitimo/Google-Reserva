@@ -262,7 +262,11 @@ export default function RestaurantCard({ restaurant, index, compact = false }: R
         </button>
         <div className="w-px bg-gray-100" />
         <button
-          onClick={() => triggerBookingChat(restaurant.name)}
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            triggerBookingChat(restaurant.name);
+          }}
           className="flex-1 py-2 text-sm text-google-blue font-medium hover:bg-blue-50 transition-colors"
         >
           Reserve

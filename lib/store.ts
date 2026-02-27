@@ -83,12 +83,19 @@ export const useAppStore = create<AppStore>((set, get) => ({
 
   // Pending booking chat (triggered from restaurant card)
   pendingBookingMessage: null,
-  triggerBookingChat: (restaurantName, time) => {
-    const message = time
-      ? `Book ${restaurantName} for ${time}`
-      : `I'd like to book ${restaurantName}`;
-    set({ pendingBookingMessage: message });
-  },
+  triggerBookingChat: (() => {
+    let lastTrigger = 0;
+    return (restaurantName: string, time?: string) => {
+      const now = Date.now();
+      if (now - lastTrigger < 1000) return;
+      lastTrigger = now;
+
+      const message = time
+        ? `Book ${restaurantName} for ${time}`
+        : `I'd like to book ${restaurantName}`;
+      set({ pendingBookingMessage: message });
+    };
+  })(),
   clearPendingBookingMessage: () => set({ pendingBookingMessage: null }),
 
   // Map state - default to Los Angeles

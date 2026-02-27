@@ -8,6 +8,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send, Mic, Sparkles, Calendar, Users, MapPin, Edit3, X, CheckCircle2, XCircle, CreditCard, Clock, ChevronDown, Shield } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
+// Module-level lock to prevent double booking submissions (survives React re-renders)
+let isProcessingBooking = false;
+let lastProcessedMessage = '';
+
 const SUGGESTED_PROMPTS = [
   "Find me a romantic Italian spot near the Ace Hotel",
   "What's good for a business dinner in Beverly Hills?",
@@ -47,11 +51,24 @@ export default function Chat() {
 
   // Auto-submit when a booking is triggered from restaurant card
   useEffect(() => {
-    if (pendingBookingMessage && !isLoading) {
-      handleSubmit(pendingBookingMessage);
+    // Use module-level variables to prevent double submission
+    if (pendingBookingMessage &&
+        !isLoading &&
+        !isProcessingBooking &&
+        pendingBookingMessage !== lastProcessedMessage) {
+      isProcessingBooking = true;
+      lastProcessedMessage = pendingBookingMessage;
+      const message = pendingBookingMessage;
       clearPendingBookingMessage();
+      handleSubmit(message).finally(() => {
+        isProcessingBooking = false;
+        // Reset lastProcessedMessage after a delay to allow rebooking same restaurant
+        setTimeout(() => {
+          lastProcessedMessage = '';
+        }, 2000);
+      });
     }
-  }, [pendingBookingMessage, isLoading]);
+  }, [pendingBookingMessage]);
 
   const handleSubmit = async (text?: string, customMessageId?: string) => {
     const messageText = text || input.trim();
