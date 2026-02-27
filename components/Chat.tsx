@@ -308,7 +308,7 @@ export default function Chat() {
 
       {/* Input */}
       <div className="flex-shrink-0 p-3 md:p-4 border-t border-gray-100 bg-white safe-area-inset-bottom overflow-hidden">
-        <div className="flex items-end gap-2 max-w-full">
+        <div className="flex items-center gap-2 max-w-full">
           <div className="flex-1 min-w-0 relative">
             <textarea
               ref={inputRef}
@@ -321,7 +321,7 @@ export default function Chat() {
               style={{ minHeight: '44px', maxHeight: '120px' }}
             />
             <button
-              className="absolute right-2 bottom-1.5 md:bottom-2 p-1.5 md:p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 md:p-2 text-gray-400 hover:text-gray-600 transition-colors"
               title="Voice input (coming soon)"
             >
               <Mic className="w-5 h-5" />
