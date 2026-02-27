@@ -117,6 +117,12 @@ export default function RestaurantCard({ restaurant, index, compact = false }: R
           <Star className="w-3.5 h-3.5 text-google-yellow fill-google-yellow" />
           <span className="text-sm font-semibold">{restaurant.rating}</span>
         </div>
+        {/* Sponsored badge */}
+        {restaurant.sponsored && (
+          <div className="absolute top-10 left-2 bg-google-blue/90 backdrop-blur-sm rounded-full px-2 py-0.5 text-xs font-medium text-white">
+            Sponsored
+          </div>
+        )}
         {/* Number badge */}
         <div className="absolute top-2 right-2 w-8 h-8 rounded-full bg-google-red text-white flex items-center justify-center font-bold text-sm shadow-lg">
           {index + 1}
@@ -158,6 +164,14 @@ export default function RestaurantCard({ restaurant, index, compact = false }: R
               {restaurant.reviewCount.toLocaleString()} reviews
             </button>
           </div>
+          {/* Open/Closed status */}
+          {!restaurant.openNow && restaurant.opensAt && (
+            <div className="flex items-center gap-1 text-xs text-red-500 mt-0.5">
+              <span className="font-medium">Closed</span>
+              <span>•</span>
+              <span>Opens at {restaurant.opensAt}</span>
+            </div>
+          )}
         </div>
 
         {/* Price, Distance & Highlights - 2 rows max on mobile */}

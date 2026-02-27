@@ -26,6 +26,7 @@ export interface Restaurant {
   };
   photos: string[];
   openNow: boolean;
+  opensAt?: string; // e.g. "5:00 PM" - shown when closed
   phone?: string;
   website?: string;
   walkingTime?: number; // minutes from reference point
@@ -33,6 +34,7 @@ export interface Restaurant {
   availableTimes?: string[];
   reviews?: Review[];
   depositPolicy?: DepositPolicy;
+  sponsored?: boolean; // for ad/monetization demo
 }
 
 export interface SearchFilters {

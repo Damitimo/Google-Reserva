@@ -234,8 +234,16 @@ function convertReviews(placeReviews: PlaceResult['reviews']): Review[] {
   }));
 }
 
+// Generate opening time for closed restaurants
+function generateOpensAt(): string {
+  const times = ['11:00 AM', '11:30 AM', '12:00 PM', '5:00 PM', '5:30 PM', '6:00 PM'];
+  return times[Math.floor(Math.random() * times.length)];
+}
+
 // Convert Places API result to our Restaurant type
-function placeToRestaurant(place: PlaceResult): Restaurant {
+function placeToRestaurant(place: PlaceResult, index: number = 0): Restaurant {
+  const openNow = place.currentOpeningHours?.openNow ?? true;
+
   return {
     id: place.id,
     name: place.displayName.text,
@@ -251,13 +259,16 @@ function placeToRestaurant(place: PlaceResult): Restaurant {
     photos: place.photos?.length
       ? place.photos.slice(0, 5).map(photo => getPhotoUrl(photo.name))
       : ['/default-restaurant.jpg'],
-    openNow: place.currentOpeningHours?.openNow ?? true,
+    openNow,
+    opensAt: !openNow ? generateOpensAt() : undefined,
     phone: place.nationalPhoneNumber,
     website: place.websiteUri,
     highlights: generateHighlights(place),
     availableTimes: generateAvailableTimes(),
     reviews: convertReviews(place.reviews),
     depositPolicy: generateDepositPolicy(place),
+    // Mark first result as sponsored (for demo)
+    sponsored: index === 0,
   };
 }
 
@@ -340,7 +351,7 @@ export async function searchRestaurants(params: {
     }
 
     const places: PlaceResult[] = data.places;
-    return places.map(placeToRestaurant);
+    return places.map((place, index) => placeToRestaurant(place, index));
   } catch (error) {
     console.error('Error searching restaurants:', error);
     return [];
@@ -399,7 +410,7 @@ export async function searchNearbyRestaurants(params: {
     }
 
     const places: PlaceResult[] = data.places;
-    return places.map(placeToRestaurant);
+    return places.map((place, index) => placeToRestaurant(place, index));
   } catch (error) {
     console.error('Error searching nearby restaurants:', error);
     return [];
