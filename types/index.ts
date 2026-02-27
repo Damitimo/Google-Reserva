@@ -59,6 +59,21 @@ export interface Reservation {
   specialRequests?: string;
 }
 
+export interface QuickReply {
+  label: string;
+  value: string;
+  action?: 'confirm_booking' | 'change_details';
+}
+
+export interface BookingSummary {
+  restaurant: Restaurant;
+  partySize: number;
+  date: string;
+  time: string;
+  depositAmount?: number;
+  depositPolicy?: DepositPolicy | null;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -67,6 +82,8 @@ export interface Message {
   toolCalls?: ToolCall[];
   restaurants?: Restaurant[];
   reservation?: Reservation;
+  quickReplies?: QuickReply[];
+  bookingSummary?: BookingSummary;
 }
 
 export interface ToolCall {

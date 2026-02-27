@@ -2,10 +2,10 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
-import { Message, Restaurant, Reservation } from '@/types';
+import { Message, Restaurant, Reservation, QuickReply } from '@/types';
 import RestaurantCard from './RestaurantCard';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Mic, Sparkles, Calendar, Users, MapPin, Edit3, X, CheckCircle2, XCircle, CreditCard } from 'lucide-react';
+import { Send, Mic, Sparkles, Calendar, Users, MapPin, Edit3, X, CheckCircle2, XCircle, CreditCard, Clock, ChevronDown, Shield } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 const SUGGESTED_PROMPTS = [
@@ -26,8 +26,12 @@ export default function Chat() {
   const setMapCenter = useAppStore((state) => state.setMapCenter);
   const currentReservation = useAppStore((state) => state.currentReservation);
   const setCurrentReservation = useAppStore((state) => state.setCurrentReservation);
+  const bookingContext = useAppStore((state) => state.bookingContext);
+  const updateBookingContext = useAppStore((state) => state.updateBookingContext);
+  const openBookingModal = useAppStore((state) => state.openBookingModal);
 
   const [input, setInput] = useState('');
+  const [calendarCheckAfterMessageId, setCalendarCheckAfterMessageId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -39,16 +43,21 @@ export default function Chat() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSubmit = async (text?: string) => {
+  const handleSubmit = async (text?: string, customMessageId?: string) => {
     const messageText = text || input.trim();
     if (!messageText || isLoading) return;
+
+    // Clear calendar check if this is not a time selection (no customMessageId)
+    if (!customMessageId) {
+      setCalendarCheckAfterMessageId(null);
+    }
 
     setInput('');
     setIsLoading(true);
 
     // Add user message
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: customMessageId || Date.now().toString(),
       role: 'user',
       content: messageText,
       timestamp: new Date(),
@@ -121,12 +130,25 @@ export default function Chat() {
         setCurrentReservation(updatedReservation);
       }
 
+      // Update booking context if booking summary is returned
+      if (data.bookingSummary) {
+        updateBookingContext({
+          restaurant: data.bookingSummary.restaurant,
+          partySize: data.bookingSummary.partySize,
+          date: data.bookingSummary.date,
+          time: data.bookingSummary.time,
+          step: 'collecting',
+        });
+      }
+
       // Update assistant message
       updateLastMessage({
         content: data.content,
         toolCalls: data.toolCalls,
         restaurants: data.restaurants,
         reservation: updatedReservation,
+        quickReplies: data.quickReplies,
+        bookingSummary: data.bookingSummary,
       });
     } catch (error) {
       console.error('Chat error:', error);
@@ -142,6 +164,31 @@ export default function Chat() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
+    }
+  };
+
+  const handleQuickReply = async (reply: QuickReply) => {
+    if (reply.action === 'confirm_booking' && bookingContext.restaurant) {
+      // Open booking modal for final confirmation
+      setCalendarCheckAfterMessageId(null); // Clear calendar check
+      updateBookingContext({ step: 'confirming' });
+      openBookingModal(bookingContext.restaurant);
+    } else if (reply.action === 'change_details') {
+      // Let user type what they want to change
+      handleSubmit("I'd like to change the booking details");
+    } else {
+      // Check if this is a time selection (matches time pattern like "7:00 PM", "7:30 PM")
+      const isTimeSelection = /^\d{1,2}:\d{2}\s*(AM|PM)$/i.test(reply.value);
+
+      if (isTimeSelection) {
+        // Set the message ID after which calendar check should appear
+        const messageId = Date.now().toString();
+        setCalendarCheckAfterMessageId(messageId);
+        handleSubmit(reply.value, messageId);
+      } else {
+        // Regular quick reply - send as user message
+        handleSubmit(reply.value);
+      }
     }
   };
 
@@ -214,8 +261,35 @@ export default function Chat() {
           </div>
         ) : (
           <div className="space-y-4">
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} isLoading={isLoading} />
+            {messages.map((message, index) => (
+              <div key={message.id}>
+                <MessageBubble message={message} isLoading={isLoading} onQuickReply={handleQuickReply} isLastMessage={index === messages.length - 1} />
+                {/* Calendar check animation - appears after the time selection message */}
+                {calendarCheckAfterMessageId === message.id && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex justify-start mt-3"
+                  >
+                    <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm">
+                      <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
+                        <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 002 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z" fill="#4285F4"/>
+                        <path d="M12 13h5v5h-5z" fill="#34A853"/>
+                      </svg>
+                      <span className="text-sm text-gray-700">Checking your calendar...</span>
+                      <motion.div
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: 0.8 }}
+                        className="flex items-center gap-1 text-google-green"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span className="text-sm font-medium">You're free!</span>
+                      </motion.div>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
             ))}
             <div ref={messagesEndRef} />
           </div>
@@ -259,9 +333,51 @@ export default function Chat() {
   );
 }
 
+function CancelReminderPrompt() {
+  const [reminderState, setReminderState] = useState<'prompt' | 'added' | 'dismissed'>('prompt');
+
+  if (reminderState === 'added') {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 5 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center gap-2 bg-google-green/10 border border-google-green/20 rounded-xl px-4 py-3"
+      >
+        <CheckCircle2 className="w-4 h-4 text-google-green flex-shrink-0" />
+        <span className="text-sm text-gray-700">Reminder added to your device</span>
+      </motion.div>
+    );
+  }
+
+  if (reminderState === 'dismissed') {
+    return null;
+  }
+
+  return (
+    <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">
+      <p className="text-sm text-gray-700 mb-2">Want me to remind you to cancel if your plans change?</p>
+      <div className="flex gap-2">
+        <button
+          onClick={() => setReminderState('added')}
+          className="px-3 py-1.5 bg-google-blue text-white text-sm font-medium rounded-full hover:bg-blue-600 transition-colors"
+        >
+          Yes please
+        </button>
+        <button
+          onClick={() => setReminderState('dismissed')}
+          className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-full hover:bg-gray-50 transition-colors"
+        >
+          I'm all set
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ReservationCard({ reservation }: { reservation: Reservation }) {
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [isModifying, setIsModifying] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const setCurrentReservation = useAppStore((state) => state.setCurrentReservation);
   const addMessage = useAppStore((state) => state.addMessage);
   const updateLastMessage = useAppStore((state) => state.updateLastMessage);
@@ -412,13 +528,13 @@ function ReservationCard({ reservation }: { reservation: Reservation }) {
       </div>
 
       {/* Details */}
-      <div className="p-4 space-y-3">
+      <div className="p-4 space-y-2">
         <div>
           <h4 className="font-semibold text-gray-900">{reservation.restaurant.name}</h4>
           <p className="text-sm text-gray-500">{reservation.restaurant.cuisine}</p>
         </div>
 
-        <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
           <div className="flex items-center gap-2 text-gray-600">
             <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
             <span className="whitespace-nowrap">{reservation.date} at {reservation.time}</span>
@@ -429,14 +545,34 @@ function ReservationCard({ reservation }: { reservation: Reservation }) {
           </div>
         </div>
 
-        <div className="flex items-start gap-2 text-sm text-gray-500">
-          <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-          <span>{reservation.restaurant.address}</span>
-        </div>
+        {/* Expandable details */}
+        <button
+          onClick={() => setShowDetails(!showDetails)}
+          className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showDetails ? 'rotate-180' : ''}`} />
+          {showDetails ? 'Hide details' : 'Show details'}
+        </button>
 
-        <div className="pt-2 border-t border-gray-100">
-          <p className="text-xs text-gray-400">Confirmation: <span className="font-mono">{reservation.confirmationCode}</span></p>
-        </div>
+        <AnimatePresence>
+          {showDetails && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden space-y-2"
+            >
+              <div className="flex items-start gap-2 text-sm text-gray-500">
+                <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                <span>{reservation.restaurant.address}</span>
+              </div>
+
+              <div className="pt-2 border-t border-gray-100">
+                <p className="text-xs text-gray-400">Confirmation: <span className="font-mono">{reservation.confirmationCode}</span></p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Actions */}
@@ -482,10 +618,10 @@ function ReservationCard({ reservation }: { reservation: Reservation }) {
   );
 }
 
-function MessageBubble({ message, isLoading }: { message: Message; isLoading: boolean }) {
+function MessageBubble({ message, isLoading, onQuickReply, isLastMessage }: { message: Message; isLoading: boolean; onQuickReply: (reply: QuickReply) => void; isLastMessage: boolean }) {
   const isUser = message.role === 'user';
-  const isLastMessage = useAppStore.getState().messages[useAppStore.getState().messages.length - 1]?.id === message.id;
   const showLoading = isLoading && isLastMessage && !message.content;
+  const buttonsActive = isLastMessage && !isLoading;
 
   return (
     <motion.div
@@ -529,8 +665,85 @@ function MessageBubble({ message, isLoading }: { message: Message; isLoading: bo
               </div>
             )}
 
-            {/* Restaurant cards - horizontal scroll */}
-            {message.restaurants && message.restaurants.length > 0 && (
+            {/* Booking summary card */}
+            {message.bookingSummary && (
+              <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm">
+                <div className="flex items-start gap-3">
+                  <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-gray-100 flex items-center justify-center">
+                    {message.bookingSummary.restaurant.photos?.[0] ? (
+                      <img
+                        src={message.bookingSummary.restaurant.photos[0]}
+                        alt={message.bookingSummary.restaurant.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-xl">🍽️</span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-gray-900 text-sm truncate">{message.bookingSummary.restaurant.name}</h4>
+                    <div className="flex items-center gap-3 text-xs text-gray-600 mt-1 flex-wrap">
+                      <span className="flex items-center gap-1 whitespace-nowrap">
+                        <Users className="w-3.5 h-3.5 flex-shrink-0" />
+                        {message.bookingSummary.partySize} people
+                      </span>
+                      <span className="flex items-center gap-1 whitespace-nowrap">
+                        <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+                        {message.bookingSummary.date}
+                      </span>
+                      <span className="flex items-center gap-1 whitespace-nowrap">
+                        <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                        {message.bookingSummary.time}
+                      </span>
+                    </div>
+                    {(message.bookingSummary.depositAmount ?? 0) > 0 ? (
+                      <>
+                        <div className="flex items-center gap-1.5 text-xs text-amber-700 mt-1">
+                          <CreditCard className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span>Deposit: ${message.bookingSummary.depositAmount}</span>
+                        </div>
+                        <div className="flex items-start gap-1.5 text-xs text-gray-500 mt-0.5">
+                          <Shield className="w-3.5 h-3.5 flex-shrink-0 text-google-green mt-0.5" />
+                          <span>Refundable if cancelled 5hrs before, I'll remind you</span>
+                        </div>
+                      </>
+                    ) : message.bookingSummary.depositPolicy ? (
+                      <div className="flex items-start gap-1.5 text-xs text-gray-500 mt-1">
+                        <Shield className="w-3.5 h-3.5 flex-shrink-0 text-google-green mt-0.5" />
+                        <span>No deposit required for {message.bookingSummary.partySize} guests</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-xs text-google-green mt-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span>No payment required</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Quick reply buttons - only show on last message */}
+            {message.quickReplies && message.quickReplies.length > 0 && buttonsActive && (
+              <div className="flex flex-wrap gap-2">
+                {message.quickReplies.map((reply, i) => (
+                  <button
+                    key={i}
+                    onClick={() => onQuickReply(reply)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      reply.action === 'confirm_booking'
+                        ? 'bg-google-blue text-white hover:bg-blue-600'
+                        : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {reply.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Restaurant cards - horizontal scroll (don't show during booking flow) */}
+            {message.restaurants && message.restaurants.length > 0 && !message.quickReplies && !message.bookingSummary && (
               <div className="mt-2 -mr-4 md:-mr-6 h-[360px] md:h-[420px]">
                 <div className="flex gap-3 overflow-x-auto overflow-y-hidden h-full pb-2 pr-4 md:pr-6 scrollbar-hide snap-x snap-mandatory">
                   {message.restaurants.map((restaurant, index) => (
@@ -548,6 +761,36 @@ function MessageBubble({ message, isLoading }: { message: Message; isLoading: bo
             {/* Reservation confirmation card */}
             {message.reservation && (
               <ReservationCard reservation={message.reservation} />
+            )}
+
+            {/* Added to calendar confirmation - shows after confirmed reservation */}
+            {message.reservation && message.reservation.status === 'confirmed' && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm mt-2"
+                >
+                  <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
+                    <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 002 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z" fill="#4285F4"/>
+                    <path d="M12 13h5v5h-5z" fill="#34A853"/>
+                  </svg>
+                  <div className="flex-1">
+                    <span className="text-sm text-gray-700">Added to Google Calendar</span>
+                    <p className="text-xs text-gray-500">{message.reservation.time} · {message.reservation.date}</p>
+                  </div>
+                  <CheckCircle2 className="w-4 h-4 text-google-green flex-shrink-0" />
+                </motion.div>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.8 }}
+                  className="mt-2"
+                >
+                  <CancelReminderPrompt />
+                </motion.div>
+              </>
             )}
           </div>
         )}

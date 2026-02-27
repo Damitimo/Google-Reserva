@@ -164,6 +164,13 @@ export default function RestaurantCard({ restaurant, index, compact = false }: R
               {restaurant.reviewCount.toLocaleString()} reviews
             </button>
           </div>
+          {/* Address */}
+          {restaurant.address && (
+            <div className="flex items-center gap-1 text-xs text-gray-400 mt-0.5 truncate">
+              <MapPin className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate">{restaurant.address}</span>
+            </div>
+          )}
           {/* Open/Closed status */}
           {!restaurant.openNow && restaurant.opensAt && (
             <div className="flex items-center gap-1 text-xs text-red-500 mt-0.5">

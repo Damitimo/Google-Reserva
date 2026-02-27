@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '@/lib/store';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, Calendar, Clock, Users, MessageSquare, Loader2, CheckCircle2, CalendarPlus, Share2, CreditCard, Wallet, Shield } from 'lucide-react';
+import { X, Check, Loader2, CheckCircle2, CalendarPlus, Share2, CreditCard, Wallet, Shield } from 'lucide-react';
 
-type BookingStep = 'details' | 'linkPayment' | 'review' | 'processing' | 'confirmed';
+type BookingStep = 'linkPayment' | 'review' | 'processing' | 'confirmed';
 
 // Helper to calculate deposit amount based on policy and party size
 function calculateDeposit(policy: { type: string; amount: number; minPartySize?: number } | undefined, partySize: number): number {
@@ -41,33 +41,41 @@ function formatDepositLabel(policy: { type: string; amount: number; minPartySize
 }
 
 export default function BookingModal() {
-  const { showBookingModal, bookingRestaurant, closeBookingModal, setCurrentReservation, addMessage } = useAppStore();
-  const [step, setStep] = useState<BookingStep>('details');
-  const [selectedTime, setSelectedTime] = useState<string>('');
-  const [partySize, setPartySize] = useState(2);
-  const [specialRequests, setSpecialRequests] = useState('');
+  const {
+    showBookingModal,
+    bookingRestaurant,
+    closeBookingModal,
+    setCurrentReservation,
+    addMessage,
+    bookingContext,
+    resetBookingContext,
+  } = useAppStore();
+
+  // Use booking context for values collected conversationally
+  const partySize = bookingContext.partySize || 2;
+  const selectedDate = bookingContext.date || 'Tonight';
+  const selectedTime = bookingContext.time || bookingRestaurant?.availableTimes?.[0] || '7:00 PM';
+  const specialRequests = bookingContext.specialRequests || '';
+
+  const [step, setStep] = useState<BookingStep>('review');
   const [confirmationCode, setConfirmationCode] = useState('');
   const [calendarAdded, setCalendarAdded] = useState(false);
   const [isGooglePayLinked, setIsGooglePayLinked] = useState(false);
   const [isLinkingPayment, setIsLinkingPayment] = useState(false);
 
+  const hasDeposit = calculateDeposit(bookingRestaurant?.depositPolicy, partySize) > 0;
+
   useEffect(() => {
     if (showBookingModal) {
-      setStep('details');
-      setSelectedTime(bookingRestaurant?.availableTimes?.[0] || '');
-      setPartySize(2);
-      setSpecialRequests('');
+      // If no deposit, go straight to review. Otherwise check if payment is linked.
+      if (!hasDeposit) {
+        setStep('review');
+      } else {
+        setStep(isGooglePayLinked ? 'review' : 'linkPayment');
+      }
       setCalendarAdded(false);
     }
-  }, [showBookingModal, bookingRestaurant]);
-
-  const handleContinueToPayment = () => {
-    if (isGooglePayLinked) {
-      setStep('review');
-    } else {
-      setStep('linkPayment');
-    }
-  };
+  }, [showBookingModal, isGooglePayLinked, hasDeposit]);
 
   const handleLinkGooglePay = async () => {
     setIsLinkingPayment(true);
@@ -93,7 +101,7 @@ export default function BookingModal() {
       setCurrentReservation({
         id: code,
         restaurant: bookingRestaurant,
-        date: 'Tonight',
+        date: selectedDate,
         time: selectedTime,
         partySize,
         status: 'confirmed',
@@ -116,7 +124,7 @@ export default function BookingModal() {
       const reservation = {
         id: confirmationCode,
         restaurant: bookingRestaurant,
-        date: 'Tonight',
+        date: selectedDate,
         time: selectedTime,
         partySize,
         status: 'confirmed' as const,
@@ -127,11 +135,12 @@ export default function BookingModal() {
       addMessage({
         id: `res-${Date.now()}`,
         role: 'assistant',
-        content: `Your reservation at **${bookingRestaurant.name}** is confirmed for **${selectedTime}** tonight, party of ${partySize}.`,
+        content: `Your reservation at **${bookingRestaurant.name}** is confirmed for **${selectedTime}** ${selectedDate.toLowerCase()}, party of ${partySize}.`,
         timestamp: new Date(),
         reservation,
       });
     }
+    resetBookingContext();
     closeBookingModal();
   };
 
@@ -169,114 +178,6 @@ export default function BookingModal() {
 
           {/* Content */}
           <div className="p-4 md:p-6">
-            {step === 'details' && (
-              <div className="space-y-4 md:space-y-5">
-                {/* Date */}
-                <div>
-                  <label className="flex items-center text-sm font-medium text-gray-700 mb-1.5 md:mb-2">
-                    <Calendar className="w-4 h-4 mr-2 text-gray-400" />
-                    Date
-                  </label>
-                  <div className="flex gap-1.5 md:gap-2">
-                    {['Tonight', 'Tomorrow', 'Sat', 'Sun'].map((date) => (
-                      <button
-                        key={date}
-                        className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-sm font-medium transition-colors ${
-                          date === 'Tonight'
-                            ? 'bg-google-blue text-white'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        {date}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Time */}
-                <div>
-                  <label className="flex items-center text-sm font-medium text-gray-700 mb-1.5 md:mb-2">
-                    <Clock className="w-4 h-4 mr-2 text-gray-400" />
-                    Time
-                  </label>
-                  <div className="flex flex-wrap gap-1.5 md:gap-2">
-                    {bookingRestaurant.availableTimes?.map((time) => (
-                      <button
-                        key={time}
-                        onClick={() => setSelectedTime(time)}
-                        className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-sm font-medium transition-colors ${
-                          selectedTime === time
-                            ? 'bg-google-blue text-white'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        {time}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Party Size */}
-                <div>
-                  <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                    <Users className="w-4 h-4 mr-2 text-gray-400" />
-                    Party size
-                  </label>
-                  <div className="flex items-center gap-4">
-                    <button
-                      onClick={() => setPartySize(Math.max(1, partySize - 1))}
-                      className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-xl font-medium"
-                    >
-                      −
-                    </button>
-                    <span className="text-2xl font-semibold w-8 text-center">{partySize}</span>
-                    <button
-                      onClick={() => setPartySize(Math.min(12, partySize + 1))}
-                      className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-xl font-medium"
-                    >
-                      +
-                    </button>
-                    <span className="text-gray-500 text-sm">
-                      {partySize === 1 ? 'guest' : 'guests'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Special Requests */}
-                <div>
-                  <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
-                    <MessageSquare className="w-4 h-4 mr-2 text-gray-400" />
-                    Special requests
-                  </label>
-                  <textarea
-                    value={specialRequests}
-                    onChange={(e) => setSpecialRequests(e.target.value)}
-                    placeholder="Allergies, occasion, seating preference..."
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl resize-none h-20 text-sm"
-                  />
-                </div>
-
-                {/* Deposit Notice */}
-                {bookingRestaurant.depositPolicy && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-amber-600" />
-                      <span className="text-sm text-amber-800 font-medium">
-                        {bookingRestaurant.depositPolicy.type === 'hold_only'
-                          ? 'Card hold required'
-                          : formatDepositLabel(bookingRestaurant.depositPolicy, partySize)}
-                      </span>
-                    </div>
-                    {calculateDeposit(bookingRestaurant.depositPolicy, partySize) > 0 && (
-                      <span className="text-sm font-bold text-amber-900">
-                        ${calculateDeposit(bookingRestaurant.depositPolicy, partySize)}.00
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
             {step === 'linkPayment' && (
               <div className="py-6">
                 <div className="text-center mb-6">
@@ -334,24 +235,26 @@ export default function BookingModal() {
                 </button>
 
                 <button
-                  onClick={() => setStep('details')}
+                  onClick={closeBookingModal}
                   className="w-full mt-3 text-sm text-gray-500 hover:text-gray-700"
                 >
-                  Back to details
+                  Cancel
                 </button>
               </div>
             )}
 
             {step === 'review' && (
               <div className="py-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Review & Confirm</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  {hasDeposit ? 'Review & Confirm' : 'Confirm Your Reservation'}
+                </h3>
 
                 {/* Reservation Summary */}
                 <div className="bg-gray-50 rounded-xl p-4 mb-4">
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <p className="text-gray-400 text-xs">Date</p>
-                      <p className="font-medium">Tonight</p>
+                      <p className="font-medium">{selectedDate}</p>
                     </div>
                     <div>
                       <p className="text-gray-400 text-xs">Time</p>
@@ -374,22 +277,22 @@ export default function BookingModal() {
                   )}
                 </div>
 
-                {/* Payment Details */}
-                <div className="border border-gray-200 rounded-xl p-4 mb-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-gray-700">Payment Method</span>
-                    <div className="flex items-center gap-2">
-                      <svg className="w-6 h-6" viewBox="0 0 24 24">
-                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                      </svg>
-                      <span className="text-sm text-gray-600">••••4242</span>
-                    </div>
-                  </div>
-                  {calculateDeposit(bookingRestaurant?.depositPolicy, partySize) > 0 ? (
-                    <>
+                {/* Payment Details - only show if deposit required */}
+                {hasDeposit && (
+                  <>
+                    <div className="border border-gray-200 rounded-xl p-4 mb-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-700">Payment Method</span>
+                        <div className="flex items-center gap-2">
+                          <svg className="w-6 h-6" viewBox="0 0 24 24">
+                            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                          </svg>
+                          <span className="text-sm text-gray-600">••••4242</span>
+                        </div>
+                      </div>
                       <div className="flex items-center justify-between py-3 border-t border-gray-100">
                         <span className="text-sm text-gray-600">
                           {formatDepositLabel(bookingRestaurant?.depositPolicy, partySize)}
@@ -404,36 +307,40 @@ export default function BookingModal() {
                           ${calculateDeposit(bookingRestaurant?.depositPolicy, partySize)}.00
                         </span>
                       </div>
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-between py-3 border-t border-gray-100">
-                      <span className="text-sm text-gray-600">Card hold only</span>
-                      <span className="text-sm font-medium text-gray-400">No charge</span>
                     </div>
-                  )}
-                </div>
+                    <p className="text-xs text-gray-400 text-center mb-4">
+                      Deposit is refundable if cancelled 24 hours in advance
+                    </p>
+                  </>
+                )}
 
-                <p className="text-xs text-gray-400 text-center mb-4">
-                  Deposit is refundable if cancelled 24 hours in advance
-                </p>
+                {/* No deposit message */}
+                {!hasDeposit && (
+                  <div className="flex items-center gap-2 bg-google-green/10 rounded-xl px-4 py-3 mb-4">
+                    <Check className="w-5 h-5 text-google-green flex-shrink-0" />
+                    <span className="text-sm text-gray-700">No payment required for this reservation</span>
+                  </div>
+                )}
 
                 <button
                   onClick={handleBook}
                   className="w-full btn-primary py-3 text-base flex items-center justify-center gap-2"
                 >
-                  <CreditCard className="w-5 h-5" />
-                  <span>
-                    {calculateDeposit(bookingRestaurant?.depositPolicy, partySize) > 0
-                      ? `Confirm & Pay $${calculateDeposit(bookingRestaurant?.depositPolicy, partySize)}`
-                      : 'Confirm Reservation'}
-                  </span>
+                  {hasDeposit ? (
+                    <>
+                      <CreditCard className="w-5 h-5" />
+                      <span>Confirm & Pay ${calculateDeposit(bookingRestaurant?.depositPolicy, partySize)}</span>
+                    </>
+                  ) : (
+                    <span>Confirm Reservation</span>
+                  )}
                 </button>
 
                 <button
-                  onClick={() => setStep('details')}
+                  onClick={closeBookingModal}
                   className="w-full mt-3 text-sm text-gray-500 hover:text-gray-700"
                 >
-                  Back to details
+                  Cancel
                 </button>
               </div>
             )}
@@ -464,17 +371,9 @@ export default function BookingModal() {
                   status="completed"
                   delay={2000}
                 />
-                {calculateDeposit(bookingRestaurant?.depositPolicy, partySize) > 0 ? (
+                {hasDeposit && (
                   <ProcessingStep
                     label={`Processing $${calculateDeposit(bookingRestaurant?.depositPolicy, partySize)} deposit`}
-                    sublabel="Google Pay • ••••4242"
-                    status="completed"
-                    delay={3000}
-                    icon={<CreditCard className="w-5 h-5 text-google-blue" />}
-                  />
-                ) : (
-                  <ProcessingStep
-                    label="Authorizing card hold"
                     sublabel="Google Pay • ••••4242"
                     status="completed"
                     delay={3000}
@@ -485,7 +384,7 @@ export default function BookingModal() {
                   label="Confirming with restaurant"
                   sublabel="Finalizing reservation"
                   status="loading"
-                  delay={4000}
+                  delay={hasDeposit ? 4000 : 3000}
                 />
               </div>
             )}
@@ -513,7 +412,7 @@ export default function BookingModal() {
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <p className="text-gray-400">Date</p>
-                      <p className="font-medium">Tonight</p>
+                      <p className="font-medium">{selectedDate}</p>
                     </div>
                     <div>
                       <p className="text-gray-400">Time</p>
@@ -530,25 +429,21 @@ export default function BookingModal() {
                   </div>
                 </div>
 
-                {/* Deposit Info */}
-                <div className="flex items-center justify-between bg-blue-50 rounded-lg px-4 py-3 mb-4">
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-google-blue" />
-                    <span className="text-sm text-gray-700">
-                      {calculateDeposit(bookingRestaurant?.depositPolicy, partySize) > 0
-                        ? 'Deposit charged'
-                        : 'Card on hold'}
-                    </span>
+                {/* Deposit Info - only show if deposit was charged */}
+                {hasDeposit && (
+                  <div className="flex items-center justify-between bg-blue-50 rounded-lg px-4 py-3 mb-4">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-google-blue" />
+                      <span className="text-sm text-gray-700">Deposit charged</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-sm font-semibold text-gray-900">
+                        ${calculateDeposit(bookingRestaurant?.depositPolicy, partySize)}.00
+                      </span>
+                      <p className="text-xs text-gray-500">Google Pay ••••4242</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="text-sm font-semibold text-gray-900">
-                      {calculateDeposit(bookingRestaurant?.depositPolicy, partySize) > 0
-                        ? `$${calculateDeposit(bookingRestaurant?.depositPolicy, partySize)}.00`
-                        : 'No charge'}
-                    </span>
-                    <p className="text-xs text-gray-500">Google Pay ••••4242</p>
-                  </div>
-                </div>
+                )}
 
                 <p className="text-sm text-gray-500 mb-4">
                   Confirmation sent to your phone
@@ -585,23 +480,6 @@ export default function BookingModal() {
           </div>
 
           {/* Footer */}
-          {step === 'details' && (
-            <div className="p-4 md:p-6 border-t border-gray-100 bg-gray-50">
-              <button
-                onClick={handleContinueToPayment}
-                disabled={!selectedTime}
-                className="w-full btn-primary py-3 text-base disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {bookingRestaurant?.depositPolicy && calculateDeposit(bookingRestaurant.depositPolicy, partySize) > 0
-                  ? 'Continue to Payment'
-                  : 'Continue'}
-              </button>
-              <p className="text-xs text-gray-400 text-center mt-3">
-                Free cancellation up to 24 hours before
-              </p>
-            </div>
-          )}
-
           {step === 'confirmed' && (
             <div className="p-4 md:p-6 border-t border-gray-100 bg-gray-50">
               <button
@@ -615,6 +493,37 @@ export default function BookingModal() {
         </motion.div>
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+function AnimatedCheckmark({ className = "w-5 h-5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none">
+      {/* Circle that draws first */}
+      <motion.circle
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="#34A853"
+        strokeWidth="2"
+        fill="none"
+        initial={{ pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+      />
+      {/* Checkmark that draws after circle */}
+      <motion.path
+        d="M7 12.5l3 3 7-7"
+        stroke="#34A853"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill="none"
+        initial={{ pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 0.3, delay: 0.4, ease: "easeOut" }}
+      />
+    </svg>
   );
 }
 
@@ -659,19 +568,13 @@ function ProcessingStep({
     >
       <div className="w-8 h-8 flex items-center justify-center">
         {currentStatus === 'pending' && (
-          <div className="w-4 h-4 rounded-full border-2 border-gray-200" />
+          <div className="w-5 h-5 rounded-full border-2 border-gray-200" />
         )}
         {currentStatus === 'loading' && (
           <Loader2 className="w-5 h-5 text-google-blue animate-spin" />
         )}
         {currentStatus === 'completed' && (
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: 'spring', stiffness: 300 }}
-          >
-            {icon || <Check className="w-5 h-5 text-google-green" />}
-          </motion.div>
+          icon || <AnimatedCheckmark className="w-6 h-6" />
         )}
       </div>
       <div className="flex-1">

@@ -74,6 +74,10 @@ const tools: Tool[] = [
               type: SchemaType.STRING,
               description: 'The ID of the restaurant',
             },
+            restaurant_name: {
+              type: SchemaType.STRING,
+              description: 'The name of the restaurant (use if ID is not available)',
+            },
             date: {
               type: SchemaType.STRING,
               description: 'The date for the reservation (e.g., "Saturday", "tomorrow", "2024-02-15")',
@@ -87,7 +91,7 @@ const tools: Tool[] = [
               description: 'Number of guests',
             },
           },
-          required: ['restaurant_id', 'party_size'],
+          required: ['party_size'],
         },
       },
       {
@@ -99,6 +103,10 @@ const tools: Tool[] = [
             restaurant_id: {
               type: SchemaType.STRING,
               description: 'The ID of the restaurant',
+            },
+            restaurant_name: {
+              type: SchemaType.STRING,
+              description: 'The name of the restaurant (use if ID is not available)',
             },
             date: {
               type: SchemaType.STRING,
@@ -117,7 +125,7 @@ const tools: Tool[] = [
               description: 'Any special requests (dietary, seating preferences, occasion)',
             },
           },
-          required: ['restaurant_id', 'date', 'time', 'party_size'],
+          required: ['date', 'time', 'party_size'],
         },
       },
       {
@@ -172,6 +180,36 @@ const tools: Tool[] = [
           required: ['confirmation_code', 'restaurant_name'],
         },
       },
+      {
+        name: 'collect_booking_info',
+        description: 'Use this when the user wants to book a restaurant. This starts a conversational flow to collect party size, date, and time. Call this to track what info we have and what we still need.',
+        parameters: {
+          type: SchemaType.OBJECT,
+          properties: {
+            restaurant_id: {
+              type: SchemaType.STRING,
+              description: 'The ID of the restaurant to book',
+            },
+            restaurant_name: {
+              type: SchemaType.STRING,
+              description: 'The name of the restaurant',
+            },
+            party_size: {
+              type: SchemaType.NUMBER,
+              description: 'Number of people (if already mentioned by user)',
+            },
+            date: {
+              type: SchemaType.STRING,
+              description: 'The date (if already mentioned, e.g., "tonight", "tomorrow", "Saturday")',
+            },
+            time: {
+              type: SchemaType.STRING,
+              description: 'The time (if already mentioned, e.g., "7pm", "around 8")',
+            },
+          },
+          required: ['restaurant_id', 'restaurant_name'],
+        },
+      },
     ],
   },
 ];
@@ -207,16 +245,47 @@ Your capabilities:
 - Update the map to show relevant locations and search areas
 
 Guidelines:
-1. When users mention a location (like "near the Ace Hotel"), immediately search and show options on the map
+1. When users mention a location (like "near the Ace Hotel"), immediately search and show options
 2. Always provide 2-4 curated recommendations, not long lists
 3. Include relevant details like walking time, signature dishes, and why each place fits their needs
 4. When recommending, lead with your top pick and explain why
 5. After showing options, ask if they'd like to book or see more details
-6. When booking, confirm all details before finalizing
-7. Be conversational - use natural language, not bullet points
-8. When users say "tonight", "today", "tomorrow", etc., use the current date/time above to determine the actual date
-9. When users want to modify an existing reservation, ask what they'd like to change (time, date, or party size), then use the modify_reservation function
-10. For modifications, use the confirmation code and restaurant name provided by the user - do NOT try to look up the restaurant
+6. Be conversational - use natural language, not bullet points
+7. When users say "tonight", "today", "tomorrow", etc., use the current date/time above to determine the actual date
+8. When users want to modify an existing reservation, ask what they'd like to change (time, date, or party size), then use the modify_reservation function
+9. For modifications, use the confirmation code and restaurant name provided by the user - do NOT try to look up the restaurant
+10. NEVER say "I've updated the map" or reference the map - just present the restaurants naturally
+
+IMPORTANT - Conversational Booking Flow:
+When a user wants to book a restaurant, you MUST use the collect_booking_info tool:
+- ALWAYS call collect_booking_info for EVERY step of the booking conversation - this generates quick reply buttons
+- Call it when user first says they want to book, and call it again with updated info as they provide each piece
+- If the restaurant was shown in previous search results, use collect_booking_info to start booking
+- If the user mentions a restaurant NOT from recent results, FIRST use search_restaurants to find it, then proceed with booking
+- Extract any info already mentioned (e.g., "book for 4 tomorrow" = party_size: 4, date: "tomorrow")
+- ONLY ask for information that hasn't been provided yet
+- If party size is missing, ask "How many people?"
+- If date is missing, ask "When would you like to go?"
+- If time is missing, ask "What time works for you?"
+- NEVER say "Checking your calendar" or "You're free" in your responses - the UI handles this automatically when a time is selected
+- When user selects a date, just acknowledge it simply like "Great, tomorrow it is! What time works for you?"
+- When all info is collected, show a brief summary and let user confirm
+- DO NOT open a booking modal - the conversation handles everything until final payment confirmation
+- If collect_booking_info returns an error, apologize and offer to search for the restaurant
+
+Example flow (ALWAYS call collect_booking_info at each step to generate quick reply buttons):
+User: "Book Sushi Gen"
+You: [call collect_booking_info with restaurant_name: "Sushi Gen"] "Great choice! How many people will be joining?"
+User: "4"
+You: [call collect_booking_info with restaurant_name: "Sushi Gen", party_size: 4] "And when would you like to go?"
+User: "Tomorrow"
+You: [call collect_booking_info with restaurant_name: "Sushi Gen", party_size: 4, date: "Tomorrow"] "Tomorrow it is! What time works for you?"
+User: "7:30 PM"
+You: [call collect_booking_info with all info] "Perfect! Here's your booking summary."
+
+CRITICAL: You MUST call collect_booking_info at EVERY step - each response in the booking flow requires calling this tool with ALL previously collected info plus any new info. The quick reply buttons only appear if you call this tool.
+
+IMPORTANT: Once a user starts booking a restaurant (says "book X" or similar), do NOT call search_restaurants again. Only use collect_booking_info. The restaurant cards should NOT appear during the booking conversation - only the quick reply buttons and booking summary should appear.
 
 Remember: You're not just searching, you're curating an experience. Every recommendation should feel personal and considered.`;
 }
@@ -334,11 +403,18 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
 
     case 'check_availability': {
       const id = args.restaurant_id as string;
+      const restaurantName = args.restaurant_name as string | undefined;
 
       // Check cached Places API results first
       let restaurant = cachedRestaurants.get(id);
       if (!restaurant) {
         restaurant = MOCK_RESTAURANTS.find((r) => r.id === id);
+      }
+      // Try finding by name if ID didn't work
+      if (!restaurant && restaurantName) {
+        restaurant = MOCK_RESTAURANTS.find((r) =>
+          r.name.toLowerCase().includes(restaurantName.toLowerCase())
+        );
       }
 
       if (!restaurant) {
@@ -355,11 +431,18 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
 
     case 'make_reservation': {
       const id = args.restaurant_id as string;
+      const restaurantName = args.restaurant_name as string | undefined;
 
       // Check cached Places API results first
       let restaurant = cachedRestaurants.get(id);
       if (!restaurant) {
         restaurant = MOCK_RESTAURANTS.find((r) => r.id === id);
+      }
+      // Try finding by name if ID didn't work
+      if (!restaurant && restaurantName) {
+        restaurant = MOCK_RESTAURANTS.find((r) =>
+          r.name.toLowerCase().includes(restaurantName.toLowerCase())
+        );
       }
 
       if (!restaurant) {
@@ -415,6 +498,130 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       };
     }
 
+    case 'collect_booking_info': {
+      const restaurantId = args.restaurant_id as string;
+      const restaurantName = args.restaurant_name as string;
+      const partySize = args.party_size as number | undefined;
+      const date = args.date as string | undefined;
+      const time = args.time as string | undefined;
+
+      // Get restaurant from cache or mock
+      let restaurant = cachedRestaurants.get(restaurantId);
+      if (!restaurant) {
+        restaurant = MOCK_RESTAURANTS.find((r) => r.id === restaurantId);
+      }
+      // Try finding by name if ID didn't work
+      if (!restaurant && restaurantName) {
+        restaurant = MOCK_RESTAURANTS.find((r) =>
+          r.name.toLowerCase().includes(restaurantName.toLowerCase())
+        );
+        // If still not found and using Places API, search for it
+        if (!restaurant && USE_PLACES_API) {
+          try {
+            const searchResults = await searchPlacesAPI({
+              query: `${restaurantName} restaurant Los Angeles`,
+              location: { lat: 34.0522, lng: -118.2437 },
+              radius: 10000,
+            });
+            if (searchResults.length > 0) {
+              restaurant = searchResults[0];
+              cachedRestaurants.set(restaurant.id, restaurant);
+            }
+          } catch (e) {
+            console.error('Error searching for restaurant:', e);
+          }
+        }
+      }
+
+      // If restaurant still not found, return error with suggestion to search first
+      if (!restaurant) {
+        return {
+          status: 'error',
+          error: 'restaurant_not_found',
+          restaurant_name: restaurantName,
+          message: `Could not find "${restaurantName}". Please search for restaurants first so I can show you available options.`,
+        };
+      }
+
+      // Determine what's missing
+      const missing: string[] = [];
+      if (!partySize) missing.push('party_size');
+      if (!date) missing.push('date');
+      if (!time) missing.push('time');
+
+      // Generate quick reply options based on what's missing
+      let quickReplies: Array<{ label: string; value: string; action?: string }> = [];
+
+      if (missing.includes('party_size')) {
+        quickReplies = [
+          { label: '2 people', value: '2 people' },
+          { label: '4 people', value: '4 people' },
+          { label: '6 people', value: '6 people' },
+        ];
+      } else if (missing.includes('date')) {
+        quickReplies = [
+          { label: 'Tonight', value: 'Tonight' },
+          { label: 'Tomorrow', value: 'Tomorrow' },
+          { label: 'This weekend', value: 'This weekend' },
+        ];
+      } else if (missing.includes('time')) {
+        // Use restaurant's available times if available
+        const times = restaurant?.availableTimes?.slice(0, 4) || ['6:00 PM', '7:00 PM', '7:30 PM', '8:00 PM'];
+        quickReplies = times.map(t => ({ label: t, value: t }));
+      } else {
+        // All info collected, ready to confirm
+        // Calculate deposit if applicable
+        let depositAmount = 0;
+        if (restaurant?.depositPolicy && partySize) {
+          if (restaurant.depositPolicy.type === 'per_person') {
+            depositAmount = restaurant.depositPolicy.amount * partySize;
+          } else if (restaurant.depositPolicy.type === 'flat') {
+            if (!restaurant.depositPolicy.minPartySize || partySize >= restaurant.depositPolicy.minPartySize) {
+              depositAmount = restaurant.depositPolicy.amount;
+            }
+          }
+        }
+
+        quickReplies = [
+          { label: depositAmount > 0 ? `Confirm & Pay $${depositAmount}` : 'Confirm Reservation', value: 'confirm', action: 'confirm_booking' },
+          { label: 'Change details', value: 'change', action: 'change_details' },
+        ];
+
+        return {
+          status: 'ready_to_confirm',
+          restaurant_id: restaurantId,
+          restaurant_name: restaurantName,
+          party_size: partySize,
+          date: date,
+          time: time,
+          deposit_amount: depositAmount,
+          quick_replies: quickReplies,
+          booking_summary: restaurant ? {
+            restaurant: restaurant,
+            partySize: partySize,
+            date: date,
+            time: time,
+            depositAmount: depositAmount,
+            depositPolicy: restaurant.depositPolicy || null,
+          } : null,
+        };
+      }
+
+      return {
+        status: 'collecting',
+        restaurant_id: restaurantId,
+        restaurant_name: restaurantName,
+        collected: {
+          party_size: partySize || null,
+          date: date || null,
+          time: time || null,
+        },
+        missing: missing,
+        next_question: missing[0],
+        quick_replies: quickReplies,
+      };
+    }
+
     default:
       return { error: 'Unknown tool' };
   }
@@ -445,6 +652,8 @@ export async function POST(request: NextRequest) {
     let restaurants: Restaurant[] = [];
     let mapUpdate = null;
     let modifiedReservation = null;
+    let quickReplies: Array<{ label: string; value: string; action?: string }> | null = null;
+    let bookingSummary: { restaurant: Restaurant; partySize: number; date: string; time: string; depositAmount?: number } | null = null;
 
     // Check for function calls - handle both property access methods
     let funcCalls = response.functionCalls?.() || [];
@@ -478,6 +687,16 @@ export async function POST(request: NextRequest) {
           modifiedReservation = toolResult;
         }
 
+        if (call.name === 'collect_booking_info' && toolResult && typeof toolResult === 'object') {
+          const bookingResult = toolResult as { quick_replies?: Array<{ label: string; value: string; action?: string }>; booking_summary?: { restaurant: Restaurant; partySize: number; date: string; time: string; depositAmount?: number } };
+          if (bookingResult.quick_replies) {
+            quickReplies = bookingResult.quick_replies;
+          }
+          if (bookingResult.booking_summary) {
+            bookingSummary = bookingResult.booking_summary;
+          }
+        }
+
         functionResponses.push({
           functionResponse: {
             name: call.name,
@@ -505,6 +724,8 @@ export async function POST(request: NextRequest) {
       restaurants,
       mapUpdate,
       modifiedReservation,
+      quickReplies,
+      bookingSummary,
     });
   } catch (error) {
     console.error('Chat API error:', error);

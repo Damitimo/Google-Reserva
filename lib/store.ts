@@ -1,6 +1,16 @@
 import { create } from 'zustand';
 import { Message, Restaurant, Reservation, MapState } from '@/types';
 
+// Booking context for conversational flow
+export interface BookingContext {
+  restaurant: Restaurant | null;
+  partySize: number | null;
+  date: string | null; // "tonight", "tomorrow", "2024-03-15"
+  time: string | null; // "7:30 PM"
+  specialRequests: string | null;
+  step: 'idle' | 'collecting' | 'confirming' | 'processing' | 'confirmed';
+}
+
 interface AppStore {
   // Messages
   messages: Message[];
@@ -24,6 +34,12 @@ interface AppStore {
   // Reservation
   currentReservation: Reservation | null;
   setCurrentReservation: (reservation: Reservation | null) => void;
+
+  // Booking context (conversational flow)
+  bookingContext: BookingContext;
+  updateBookingContext: (updates: Partial<BookingContext>) => void;
+  resetBookingContext: () => void;
+  startBooking: (restaurant: Restaurant, context?: Partial<BookingContext>) => void;
 
   // Booking modal
   showBookingModal: boolean;
@@ -108,6 +124,42 @@ export const useAppStore = create<AppStore>((set, get) => ({
   // Reservation
   currentReservation: null,
   setCurrentReservation: (reservation) => set({ currentReservation: reservation }),
+
+  // Booking context (conversational flow)
+  bookingContext: {
+    restaurant: null,
+    partySize: null,
+    date: null,
+    time: null,
+    specialRequests: null,
+    step: 'idle',
+  },
+  updateBookingContext: (updates) =>
+    set((state) => ({
+      bookingContext: { ...state.bookingContext, ...updates },
+    })),
+  resetBookingContext: () =>
+    set({
+      bookingContext: {
+        restaurant: null,
+        partySize: null,
+        date: null,
+        time: null,
+        specialRequests: null,
+        step: 'idle',
+      },
+    }),
+  startBooking: (restaurant, context = {}) =>
+    set({
+      bookingContext: {
+        restaurant,
+        partySize: context.partySize || null,
+        date: context.date || null,
+        time: context.time || null,
+        specialRequests: context.specialRequests || null,
+        step: 'collecting',
+      },
+    }),
 
   // Booking modal
   showBookingModal: false,
