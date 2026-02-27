@@ -217,9 +217,9 @@ function generateHighlights(place: PlaceResult): string[] {
   return highlights.slice(0, 4);
 }
 
-// Get photo URL from photo resource name (new API format)
+// Get photo URL via our server-side proxy to avoid API key exposure and referrer issues
 function getPhotoUrl(photoName: string, maxWidth: number = 400): string {
-  return `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${maxWidth}&key=${GOOGLE_API_KEY}`;
+  return `/api/photo?name=${encodeURIComponent(photoName)}&maxWidth=${maxWidth}`;
 }
 
 // Convert Places API reviews to our Review type
