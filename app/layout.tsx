@@ -1,9 +1,15 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Reserva | AI-Powered Dining Reservations",
+  title: "Donna | AI-Powered Dining Reservations",
   description: "Discover and book the perfect restaurant with intelligent recommendations powered by Google",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
