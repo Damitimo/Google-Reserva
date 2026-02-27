@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-
 export async function GET(request: NextRequest) {
+  const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+
   const { searchParams } = new URL(request.url);
   const photoName = searchParams.get('name');
   const maxWidth = searchParams.get('maxWidth') || '400';
@@ -12,20 +12,23 @@ export async function GET(request: NextRequest) {
   }
 
   if (!GOOGLE_API_KEY) {
-    return NextResponse.json({ error: 'API key not configured' }, { status: 500 });
+    console.error('GOOGLE_API_KEY not found in environment');
+    return NextResponse.json({ error: 'API key not configured', hasKey: !!GOOGLE_API_KEY }, { status: 500 });
   }
 
   try {
     // Fetch the photo from Google Places API
     const photoUrl = `https://places.googleapis.com/v1/${photoName}/media?key=${GOOGLE_API_KEY}&maxWidthPx=${maxWidth}`;
+    console.log('Fetching photo:', photoName.substring(0, 50) + '...');
 
     const response = await fetch(photoUrl, {
       redirect: 'follow',
     });
 
     if (!response.ok) {
-      console.error('Photo fetch failed:', response.status, await response.text());
-      return NextResponse.json({ error: 'Photo not found' }, { status: 404 });
+      const errorText = await response.text();
+      console.error('Photo fetch failed:', response.status, errorText);
+      return NextResponse.json({ error: 'Photo not found', status: response.status, details: errorText.substring(0, 200) }, { status: 404 });
     }
 
     // Get the image data
