@@ -217,14 +217,9 @@ function generateHighlights(place: PlaceResult): string[] {
   return highlights.slice(0, 4);
 }
 
-// Get photo URL - use Unsplash food images for reliable demo
+// Get photo URL from photo resource name (new API format)
 function getPhotoUrl(photoName: string, maxWidth: number = 400): string {
-  // Use Unsplash food images for reliable display in demo
-  // Generate consistent image based on photo name hash
-  const hash = photoName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const foodKeywords = ['restaurant', 'food', 'dining', 'cuisine', 'dish', 'meal'];
-  const keyword = foodKeywords[hash % foodKeywords.length];
-  return `https://source.unsplash.com/${maxWidth}x${Math.round(maxWidth * 0.75)}/?${keyword},${hash % 100}`;
+  return `https://places.googleapis.com/v1/${photoName}/media?maxWidthPx=${maxWidth}&key=${GOOGLE_API_KEY}`;
 }
 
 // Convert Places API reviews to our Review type
