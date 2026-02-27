@@ -143,14 +143,14 @@ export default function BookingModal() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+        className="fixed inset-0 bg-black/50 flex items-end md:items-center justify-center z-50 md:p-4"
         onClick={(e) => e.target === e.currentTarget && step !== 'processing' && closeBookingModal()}
       >
         <motion.div
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 20, scale: 0.95 }}
-          className="booking-modal bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+          className="booking-modal bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
         >
           {/* Header */}
           <div className="relative p-6 border-b border-gray-100">

@@ -148,17 +148,17 @@ export default function Chat() {
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-gray-100">
+      <div className="flex-shrink-0 px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 bg-white">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-google-blue via-google-red to-google-yellow flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-white" />
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-google-blue via-google-red to-google-yellow flex items-center justify-center">
+              <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-white" />
             </div>
             <div>
-              <h1 className="font-semibold text-gray-900">Donna</h1>
+              <h1 className="font-semibold text-gray-900 text-sm md:text-base">Donna</h1>
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 bg-google-green rounded-full animate-pulse" />
-                <p className="text-sm text-gray-500">Agent active</p>
+                <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-google-green rounded-full animate-pulse" />
+                <p className="text-xs md:text-sm text-gray-500">Agent active</p>
               </div>
             </div>
           </div>
@@ -171,14 +171,14 @@ export default function Chat() {
             <img
               src="https://i.pravatar.cc/150?img=47"
               alt="Sarah Chen"
-              className="w-9 h-9 rounded-full border-2 border-google-blue"
+              className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-google-blue"
             />
           </div>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-4">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center">
             <motion.div
@@ -223,7 +223,7 @@ export default function Chat() {
       </div>
 
       {/* Input */}
-      <div className="flex-shrink-0 p-4 border-t border-gray-100">
+      <div className="flex-shrink-0 p-3 md:p-4 border-t border-gray-100 bg-white safe-area-inset-bottom">
         <div className="flex items-end gap-2">
           <div className="flex-1 relative">
             <textarea
@@ -233,11 +233,11 @@ export default function Chat() {
               onKeyDown={handleKeyDown}
               placeholder="Find me a restaurant..."
               rows={1}
-              className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-2xl resize-none text-sm focus:border-google-blue focus:ring-2 focus:ring-google-blue/20 transition-all"
-              style={{ minHeight: '48px', maxHeight: '120px' }}
+              className="w-full px-3 md:px-4 py-2.5 md:py-3 pr-10 md:pr-12 border border-gray-200 rounded-2xl resize-none text-sm focus:border-google-blue focus:ring-2 focus:ring-google-blue/20 transition-all"
+              style={{ minHeight: '44px', maxHeight: '120px' }}
             />
             <button
-              className="absolute right-2 bottom-2 p-2 text-gray-400 hover:text-gray-600 transition-colors"
+              className="absolute right-2 bottom-1.5 md:bottom-2 p-1.5 md:p-2 text-gray-400 hover:text-gray-600 transition-colors"
               title="Voice input (coming soon)"
             >
               <Mic className="w-5 h-5" />
@@ -246,12 +246,12 @@ export default function Chat() {
           <button
             onClick={() => handleSubmit()}
             disabled={!input.trim() || isLoading}
-            className="flex-shrink-0 w-12 h-12 rounded-full bg-google-blue text-white flex items-center justify-center hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-google-blue/30"
+            className="flex-shrink-0 w-11 h-11 md:w-12 md:h-12 rounded-full bg-google-blue text-white flex items-center justify-center hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-google-blue/30"
           >
             <Send className="w-5 h-5" />
           </button>
         </div>
-        <p className="text-xs text-gray-400 text-center mt-2">
+        <p className="text-xs text-gray-400 text-center mt-2 hidden md:block">
           Powered by Google Gemini & Maps
         </p>
       </div>
@@ -531,10 +531,10 @@ function MessageBubble({ message, isLoading }: { message: Message; isLoading: bo
 
             {/* Restaurant cards - horizontal scroll */}
             {message.restaurants && message.restaurants.length > 0 && (
-              <div className="mt-2 -mr-6">
-                <div className="flex gap-3 overflow-x-auto pb-2 pr-6 scrollbar-hide">
+              <div className="mt-2 -mr-4 md:-mr-6">
+                <div className="flex gap-3 overflow-x-auto pb-2 pr-4 md:pr-6 scrollbar-hide snap-x snap-mandatory">
                   {message.restaurants.map((restaurant, index) => (
-                    <div key={restaurant.id} className="flex-shrink-0 w-72 h-[400px]">
+                    <div key={restaurant.id} className="flex-shrink-0 w-[280px] md:w-72 h-[380px] md:h-[400px] snap-start">
                       <RestaurantCard
                         restaurant={restaurant}
                         index={index}
