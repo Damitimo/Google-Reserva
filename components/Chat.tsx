@@ -146,7 +146,7 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white">
+    <div className="flex flex-col h-full bg-white overflow-x-hidden">
       {/* Header */}
       <div className="flex-shrink-0 px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 bg-white">
         <div className="flex items-center justify-between">
@@ -223,9 +223,9 @@ export default function Chat() {
       </div>
 
       {/* Input */}
-      <div className="flex-shrink-0 p-3 md:p-4 border-t border-gray-100 bg-white safe-area-inset-bottom">
-        <div className="flex items-end gap-2">
-          <div className="flex-1 relative">
+      <div className="flex-shrink-0 p-3 md:p-4 border-t border-gray-100 bg-white safe-area-inset-bottom overflow-hidden">
+        <div className="flex items-end gap-2 max-w-full">
+          <div className="flex-1 min-w-0 relative">
             <textarea
               ref={inputRef}
               value={input}

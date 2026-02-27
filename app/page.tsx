@@ -17,7 +17,7 @@ const Map = dynamic(() => import('@/components/Map'), {
 
 export default function Home() {
   return (
-    <main className="h-screen w-screen overflow-hidden bg-gray-100">
+    <main className="h-screen w-screen overflow-hidden bg-gray-100 overflow-x-hidden">
       {/* Desktop/Tablet Layout - Map + Chat side by side */}
       <div className="hidden md:flex h-full p-4 gap-4">
         {/* Map - Left Side */}
