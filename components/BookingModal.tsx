@@ -153,35 +153,35 @@ export default function BookingModal() {
           className="booking-modal bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[85vh] overflow-y-auto"
         >
           {/* Header */}
-          <div className="relative p-6 border-b border-gray-100">
+          <div className="relative p-4 md:p-6 border-b border-gray-100">
             <button
               onClick={closeBookingModal}
               disabled={step === 'processing'}
-              className="absolute right-4 top-4 p-2 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50"
+              className="absolute right-3 top-3 md:right-4 md:top-4 p-2 hover:bg-gray-100 rounded-full transition-colors disabled:opacity-50"
             >
               <X className="w-5 h-5 text-gray-400" />
             </button>
-            <h2 className="text-xl font-semibold text-gray-900 pr-8">
+            <h2 className="text-lg md:text-xl font-semibold text-gray-900 pr-8">
               {step === 'confirmed' ? 'Reservation Confirmed!' : `Reserve at ${bookingRestaurant.name}`}
             </h2>
-            <p className="text-gray-500 mt-1">{bookingRestaurant.cuisine} • {bookingRestaurant.address}</p>
+            <p className="text-gray-500 text-sm mt-1 truncate">{bookingRestaurant.cuisine} • {bookingRestaurant.address}</p>
           </div>
 
           {/* Content */}
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             {step === 'details' && (
-              <div className="space-y-5">
+              <div className="space-y-4 md:space-y-5">
                 {/* Date */}
                 <div>
-                  <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                  <label className="flex items-center text-sm font-medium text-gray-700 mb-1.5 md:mb-2">
                     <Calendar className="w-4 h-4 mr-2 text-gray-400" />
                     Date
                   </label>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5 md:gap-2">
                     {['Tonight', 'Tomorrow', 'Sat', 'Sun'].map((date) => (
                       <button
                         key={date}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-sm font-medium transition-colors ${
                           date === 'Tonight'
                             ? 'bg-google-blue text-white'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -195,16 +195,16 @@ export default function BookingModal() {
 
                 {/* Time */}
                 <div>
-                  <label className="flex items-center text-sm font-medium text-gray-700 mb-2">
+                  <label className="flex items-center text-sm font-medium text-gray-700 mb-1.5 md:mb-2">
                     <Clock className="w-4 h-4 mr-2 text-gray-400" />
                     Time
                   </label>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-1.5 md:gap-2">
                     {bookingRestaurant.availableTimes?.map((time) => (
                       <button
                         key={time}
                         onClick={() => setSelectedTime(time)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        className={`px-3 md:px-4 py-1.5 md:py-2 rounded-lg text-sm font-medium transition-colors ${
                           selectedTime === time
                             ? 'bg-google-blue text-white'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -586,7 +586,7 @@ export default function BookingModal() {
 
           {/* Footer */}
           {step === 'details' && (
-            <div className="p-6 border-t border-gray-100 bg-gray-50">
+            <div className="p-4 md:p-6 border-t border-gray-100 bg-gray-50">
               <button
                 onClick={handleContinueToPayment}
                 disabled={!selectedTime}
@@ -601,7 +601,7 @@ export default function BookingModal() {
           )}
 
           {step === 'confirmed' && (
-            <div className="p-6 border-t border-gray-100 bg-gray-50">
+            <div className="p-4 md:p-6 border-t border-gray-100 bg-gray-50">
               <button
                 onClick={handleDone}
                 className="w-full btn-primary py-3 text-base"

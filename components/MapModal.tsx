@@ -31,7 +31,7 @@ export default function MapModal() {
           className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
         >
           {/* Map Preview */}
-          <div className="relative h-48 bg-gray-100">
+          <div className="relative h-36 md:h-48 bg-gray-100">
             <img
               src={`https://maps.googleapis.com/maps/api/staticmap?center=${restaurant.location.lat},${restaurant.location.lng}&zoom=15&size=400x200&scale=2&markers=color:red%7C${restaurant.location.lat},${restaurant.location.lng}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}`}
               alt="Map"
@@ -46,8 +46,8 @@ export default function MapModal() {
           </div>
 
           {/* Restaurant Info */}
-          <div className="p-4">
-            <h2 className="text-xl font-semibold text-gray-900">{restaurant.name}</h2>
+          <div className="p-3 md:p-4">
+            <h2 className="text-lg md:text-xl font-semibold text-gray-900">{restaurant.name}</h2>
             <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
               <span>{restaurant.cuisine}</span>
               <span>•</span>
@@ -91,12 +91,12 @@ export default function MapModal() {
           </div>
 
           {/* Actions */}
-          <div className="p-4 pt-0 flex gap-3">
+          <div className="p-3 md:p-4 pt-0 flex gap-2 md:gap-3">
             <a
               href={directionsUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex-1 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors"
+              className="flex-1 py-2.5 md:py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors"
             >
               <Navigation className="w-4 h-4" />
               Directions
@@ -106,7 +106,7 @@ export default function MapModal() {
                 closeMapModal();
                 openBookingModal(restaurant);
               }}
-              className="flex-1 py-3 bg-google-blue text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors"
+              className="flex-1 py-2.5 md:py-3 bg-google-blue text-white rounded-xl text-sm font-medium hover:bg-blue-600 transition-colors"
             >
               Reserve
             </button>
