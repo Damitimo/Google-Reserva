@@ -29,6 +29,8 @@ export default function Chat() {
   const bookingContext = useAppStore((state) => state.bookingContext);
   const updateBookingContext = useAppStore((state) => state.updateBookingContext);
   const openBookingModal = useAppStore((state) => state.openBookingModal);
+  const pendingBookingMessage = useAppStore((state) => state.pendingBookingMessage);
+  const clearPendingBookingMessage = useAppStore((state) => state.clearPendingBookingMessage);
 
   const [input, setInput] = useState('');
   const [calendarCheckAfterMessageId, setCalendarCheckAfterMessageId] = useState<string | null>(null);
@@ -42,6 +44,14 @@ export default function Chat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Auto-submit when a booking is triggered from restaurant card
+  useEffect(() => {
+    if (pendingBookingMessage && !isLoading) {
+      handleSubmit(pendingBookingMessage);
+      clearPendingBookingMessage();
+    }
+  }, [pendingBookingMessage, isLoading]);
 
   const handleSubmit = async (text?: string, customMessageId?: string) => {
     const messageText = text || input.trim();

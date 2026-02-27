@@ -17,6 +17,11 @@ interface AppStore {
   addMessage: (message: Message) => void;
   updateLastMessage: (updates: Partial<Message>) => void;
 
+  // Pending booking chat (triggered from restaurant card)
+  pendingBookingMessage: string | null;
+  triggerBookingChat: (restaurantName: string, time?: string) => void;
+  clearPendingBookingMessage: () => void;
+
   // Map state
   mapState: MapState;
   setMapCenter: (center: { lat: number; lng: number }) => void;
@@ -75,6 +80,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
       return { messages };
     }),
+
+  // Pending booking chat (triggered from restaurant card)
+  pendingBookingMessage: null,
+  triggerBookingChat: (restaurantName, time) => {
+    const message = time
+      ? `Book ${restaurantName} for ${time}`
+      : `I'd like to book ${restaurantName}`;
+    set({ pendingBookingMessage: message });
+  },
+  clearPendingBookingMessage: () => set({ pendingBookingMessage: null }),
 
   // Map state - default to Los Angeles
   mapState: {

@@ -13,7 +13,7 @@ interface RestaurantCardProps {
 }
 
 export default function RestaurantCard({ restaurant, index, compact = false }: RestaurantCardProps) {
-  const { selectRestaurant, openBookingModal, openReviewsModal, openMapModal, mapState } = useAppStore();
+  const { selectRestaurant, triggerBookingChat, openReviewsModal, openMapModal, mapState } = useAppStore();
 
   // Check if mobile (under md breakpoint)
   const handleMapClick = () => {
@@ -235,7 +235,7 @@ export default function RestaurantCard({ restaurant, index, compact = false }: R
               {restaurant.availableTimes.slice(0, 4).map((time, i) => (
                 <button
                   key={i}
-                  onClick={() => openBookingModal(restaurant)}
+                  onClick={() => triggerBookingChat(restaurant.name, time)}
                   className="px-2 py-0.5 bg-google-blue/10 text-google-blue text-xs font-medium rounded-md hover:bg-google-blue/20 transition-colors"
                 >
                   {time}
@@ -262,7 +262,7 @@ export default function RestaurantCard({ restaurant, index, compact = false }: R
         </button>
         <div className="w-px bg-gray-100" />
         <button
-          onClick={() => openBookingModal(restaurant)}
+          onClick={() => triggerBookingChat(restaurant.name)}
           className="flex-1 py-2 text-sm text-google-blue font-medium hover:bg-blue-50 transition-colors"
         >
           Reserve
