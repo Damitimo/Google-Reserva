@@ -68,6 +68,7 @@ export interface QuickReply {
 export interface BookingSummary {
   restaurant: Restaurant;
   partySize: number;
+  dietaryRestrictions?: string;
   date: string;
   time: string;
   depositAmount?: number;

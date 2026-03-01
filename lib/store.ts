@@ -5,6 +5,7 @@ import { Message, Restaurant, Reservation, MapState } from '@/types';
 export interface BookingContext {
   restaurant: Restaurant | null;
   partySize: number | null;
+  dietaryRestrictions: string | null;
   date: string | null; // "tonight", "tomorrow", "2024-03-15"
   time: string | null; // "7:30 PM"
   specialRequests: string | null;
@@ -86,6 +87,11 @@ interface AppStore {
   mapModalRestaurant: Restaurant | null;
   openMapModal: (restaurant: Restaurant) => void;
   closeMapModal: () => void;
+
+  // Voice mode
+  showVoiceMode: boolean;
+  openVoiceMode: () => void;
+  closeVoiceMode: () => void;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -226,6 +232,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
   bookingContext: {
     restaurant: null,
     partySize: null,
+    dietaryRestrictions: null,
     date: null,
     time: null,
     specialRequests: null,
@@ -240,6 +247,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       bookingContext: {
         restaurant: null,
         partySize: null,
+        dietaryRestrictions: null,
         date: null,
         time: null,
         specialRequests: null,
@@ -251,6 +259,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       bookingContext: {
         restaurant,
         partySize: context.partySize || null,
+        dietaryRestrictions: context.dietaryRestrictions || null,
         date: context.date || null,
         time: context.time || null,
         specialRequests: context.specialRequests || null,
@@ -284,4 +293,9 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({ showMapModal: true, mapModalRestaurant: restaurant }),
   closeMapModal: () =>
     set({ showMapModal: false, mapModalRestaurant: null }),
+
+  // Voice mode
+  showVoiceMode: false,
+  openVoiceMode: () => set({ showVoiceMode: true }),
+  closeVoiceMode: () => set({ showVoiceMode: false }),
 }));

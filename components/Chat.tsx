@@ -5,7 +5,8 @@ import { useAppStore } from '@/lib/store';
 import { Message, Restaurant, Reservation, QuickReply } from '@/types';
 import RestaurantCard from './RestaurantCard';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Mic, Sparkles, Calendar, Users, MapPin, Edit3, X, CheckCircle2, XCircle, CreditCard, Clock, ChevronDown, Shield, AlertTriangle } from 'lucide-react';
+import { Send, Mic, MicOff, Sparkles, Calendar, Users, MapPin, Edit3, X, CheckCircle2, XCircle, CreditCard, Clock, ChevronDown, Shield, AlertTriangle, Leaf, Podcast } from 'lucide-react';
+import VoiceMode from './VoiceMode';
 import ReactMarkdown from 'react-markdown';
 
 // Module-level lock to prevent double booking submissions (survives React re-renders)
@@ -37,11 +38,18 @@ export default function Chat() {
   const clearPendingBookingMessage = useAppStore((state) => state.clearPendingBookingMessage);
   const isInBookingFlow = useAppStore((state) => state.isInBookingFlow);
   const setIsInBookingFlow = useAppStore((state) => state.setIsInBookingFlow);
+  const showVoiceMode = useAppStore((state) => state.showVoiceMode);
+  const openVoiceMode = useAppStore((state) => state.openVoiceMode);
+  const closeVoiceMode = useAppStore((state) => state.closeVoiceMode);
 
   const [input, setInput] = useState('');
   const [calendarCheckAfterMessageId, setCalendarCheckAfterMessageId] = useState<string | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [ttsEnabled, setTtsEnabled] = useState(true); // Toggle for TTS
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -50,6 +58,110 @@ export default function Chat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Set up speech recognition
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        setSpeechSupported(true);
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event) => {
+          const transcript = Array.from(event.results)
+            .map((result) => result[0].transcript)
+            .join('');
+          setInput(transcript);
+
+          // Auto-submit when speech recognition gives final result
+          if (event.results[0].isFinal) {
+            setIsListening(false);
+            // Small delay to show the final text before submitting
+            setTimeout(() => {
+              if (transcript.trim()) {
+                handleSubmit(transcript.trim());
+              }
+            }, 300);
+          }
+        };
+
+        recognition.onerror = (event) => {
+          console.error('Speech recognition error:', event.error);
+          setIsListening(false);
+        };
+
+        recognition.onend = () => {
+          setIsListening(false);
+        };
+
+        recognitionRef.current = recognition;
+      }
+    }
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) return;
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      setInput(''); // Clear input when starting to listen
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  };
+
+  // Text-to-speech function
+  const speakText = (text: string) => {
+    if (!ttsEnabled || typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    // Cancel any ongoing speech
+    window.speechSynthesis.cancel();
+
+    // Clean the text (remove markdown)
+    const cleanText = text
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/`[^`]+`/g, '')
+      .trim();
+
+    if (!cleanText) return;
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    // Try to use a female voice for Donna
+    const voices = window.speechSynthesis.getVoices();
+    const femaleVoice = voices.find(v =>
+      v.name.includes('Samantha') ||
+      v.name.includes('Google US English Female') ||
+      v.name.includes('Female') ||
+      v.name.includes('Zira')
+    );
+    if (femaleVoice) {
+      utterance.voice = femaleVoice;
+    }
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // Speak new assistant messages (only the last one when loading finishes)
+  useEffect(() => {
+    if (!isLoading && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === 'assistant' && lastMessage.content && ttsEnabled) {
+        speakText(lastMessage.content);
+      }
+    }
+  }, [isLoading, messages.length]);
 
   // Auto-submit when a booking is triggered from restaurant card
   useEffect(() => {
@@ -368,12 +480,26 @@ export default function Chat() {
               className="w-full px-3 md:px-4 py-2.5 md:py-3 pr-10 md:pr-12 border border-gray-200 rounded-2xl resize-none text-sm focus:border-google-blue focus:ring-2 focus:ring-google-blue/20 transition-all"
               style={{ minHeight: '44px', maxHeight: '120px' }}
             />
-            <button
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 md:p-2 text-gray-400 hover:text-gray-600 transition-colors"
-              title="Voice input (coming soon)"
-            >
-              <Mic className="w-5 h-5" />
-            </button>
+            {speechSupported && (
+              <button
+                onClick={toggleListening}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 p-1.5 md:p-2 transition-all ${
+                  isListening
+                    ? 'text-google-red animate-pulse'
+                    : 'text-gray-400 hover:text-gray-600'
+                }`}
+                title={isListening ? 'Stop listening' : 'Voice input'}
+              >
+                {isListening ? (
+                  <div className="relative">
+                    <MicOff className="w-5 h-5" />
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-google-red rounded-full animate-ping" />
+                  </div>
+                ) : (
+                  <Mic className="w-5 h-5" />
+                )}
+              </button>
+            )}
           </div>
           <button
             onClick={() => handleSubmit()}
@@ -382,11 +508,25 @@ export default function Chat() {
           >
             <Send className="w-5 h-5" />
           </button>
+          {/* Voice Mode Button */}
+          <button
+            onClick={openVoiceMode}
+            className="flex-shrink-0 w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all shadow-lg"
+            style={{
+              background: 'linear-gradient(135deg, #4285F4, #9B72CB, #D96570)',
+            }}
+            title="Voice Mode"
+          >
+            <Podcast className="w-5 h-5 text-white" />
+          </button>
         </div>
         <p className="text-xs text-gray-400 text-center mt-2 hidden md:block">
           Powered by Google Gemini & Maps
         </p>
       </div>
+
+      {/* Voice Mode Overlay */}
+      <VoiceMode isOpen={showVoiceMode} onClose={closeVoiceMode} />
     </div>
   );
 }
@@ -781,6 +921,12 @@ function MessageBubble({ message, isLoading, onQuickReply, isLastMessage }: { me
                         {message.bookingSummary.time}
                       </span>
                     </div>
+                    {message.bookingSummary.dietaryRestrictions && message.bookingSummary.dietaryRestrictions.toLowerCase() !== 'none' && message.bookingSummary.dietaryRestrictions.toLowerCase() !== 'no dietary restrictions' && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
+                        <Leaf className="w-3.5 h-3.5 flex-shrink-0 text-google-green" />
+                        <span>{message.bookingSummary.dietaryRestrictions}</span>
+                      </div>
+                    )}
                     {(message.bookingSummary.depositAmount ?? 0) > 0 ? (
                       <>
                         <div className="flex items-center gap-1.5 text-xs text-amber-700 mt-1">

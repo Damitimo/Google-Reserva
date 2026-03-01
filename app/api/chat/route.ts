@@ -198,6 +198,10 @@ const tools: Tool[] = [
               type: SchemaType.NUMBER,
               description: 'Number of people (if already mentioned by user)',
             },
+            dietary_restrictions: {
+              type: SchemaType.STRING,
+              description: 'Any dietary restrictions mentioned (e.g., "vegetarian", "gluten-free", "nut allergy", "none")',
+            },
             date: {
               type: SchemaType.STRING,
               description: 'The date (if already mentioned, e.g., "tonight", "tomorrow", "Saturday")',
@@ -265,6 +269,7 @@ When a user wants to book a restaurant, you MUST use the collect_booking_info to
 - Extract any info already mentioned (e.g., "book for 4 tomorrow" = party_size: 4, date: "tomorrow")
 - ONLY ask for information that hasn't been provided yet
 - If party size is missing, ask "How many people?"
+- If dietary restrictions is missing, ask "Any dietary restrictions I should note?" (after party size)
 - If date is missing, ask "When would you like to go?"
 - If time is missing, ask "What time works for you?"
 - NEVER say "Checking your calendar" or "You're free" in your responses - the UI handles this automatically when a time is selected
@@ -277,9 +282,11 @@ Example flow (ALWAYS call collect_booking_info at each step to generate quick re
 User: "Book Sushi Gen"
 You: [call collect_booking_info with restaurant_name: "Sushi Gen"] "Great choice! How many people will be joining?"
 User: "4"
-You: [call collect_booking_info with restaurant_name: "Sushi Gen", party_size: 4] "And when would you like to go?"
+You: [call collect_booking_info with restaurant_name: "Sushi Gen", party_size: 4] "Any dietary restrictions I should note?"
+User: "No dietary restrictions"
+You: [call collect_booking_info with restaurant_name: "Sushi Gen", party_size: 4, dietary_restrictions: "none"] "Great! When would you like to go?"
 User: "Tomorrow"
-You: [call collect_booking_info with restaurant_name: "Sushi Gen", party_size: 4, date: "Tomorrow"] "Tomorrow it is! What time works for you?"
+You: [call collect_booking_info with restaurant_name: "Sushi Gen", party_size: 4, dietary_restrictions: "none", date: "Tomorrow"] "Tomorrow it is! What time works for you?"
 User: "7:30 PM"
 You: [call collect_booking_info with all info] "Perfect! Here's your booking summary."
 
@@ -509,6 +516,7 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       const restaurantId = args.restaurant_id as string;
       const restaurantName = args.restaurant_name as string;
       const partySize = args.party_size as number | undefined;
+      const dietaryRestrictions = args.dietary_restrictions as string | undefined;
       const date = args.date as string | undefined;
       const time = args.time as string | undefined;
 
@@ -553,6 +561,7 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       // Determine what's missing
       const missing: string[] = [];
       if (!partySize) missing.push('party_size');
+      if (!dietaryRestrictions) missing.push('dietary_restrictions');
       if (!date) missing.push('date');
       if (!time) missing.push('time');
 
@@ -564,6 +573,13 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
           { label: '2 people', value: '2 people' },
           { label: '4 people', value: '4 people' },
           { label: '6 people', value: '6 people' },
+        ];
+      } else if (missing.includes('dietary_restrictions')) {
+        quickReplies = [
+          { label: 'None', value: 'No dietary restrictions' },
+          { label: 'Vegetarian', value: 'Vegetarian' },
+          { label: 'Vegan', value: 'Vegan' },
+          { label: 'Gluten-free', value: 'Gluten-free' },
         ];
       } else if (missing.includes('date')) {
         quickReplies = [
@@ -599,6 +615,7 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
           restaurant_id: restaurantId,
           restaurant_name: restaurantName,
           party_size: partySize,
+          dietary_restrictions: dietaryRestrictions,
           date: date,
           time: time,
           deposit_amount: depositAmount,
@@ -606,6 +623,7 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
           booking_summary: restaurant ? {
             restaurant: restaurant,
             partySize: partySize,
+            dietaryRestrictions: dietaryRestrictions,
             date: date,
             time: time,
             depositAmount: depositAmount,
@@ -620,6 +638,7 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
         restaurant_name: restaurantName,
         collected: {
           party_size: partySize || null,
+          dietary_restrictions: dietaryRestrictions || null,
           date: date || null,
           time: time || null,
         },
