@@ -35,6 +35,8 @@ export default function Chat() {
   const openBookingModal = useAppStore((state) => state.openBookingModal);
   const pendingBookingMessage = useAppStore((state) => state.pendingBookingMessage);
   const clearPendingBookingMessage = useAppStore((state) => state.clearPendingBookingMessage);
+  const isInBookingFlow = useAppStore((state) => state.isInBookingFlow);
+  const setIsInBookingFlow = useAppStore((state) => state.setIsInBookingFlow);
 
   const [input, setInput] = useState('');
   const [calendarCheckAfterMessageId, setCalendarCheckAfterMessageId] = useState<string | null>(null);
@@ -116,8 +118,9 @@ export default function Chat() {
 
       const data = await response.json();
 
-      // Update map with restaurants if returned
-      if (data.restaurants && data.restaurants.length > 0) {
+      // Update map with restaurants if returned (but NOT during booking flow)
+      // If quickReplies exist, we're in booking flow - don't update map markers
+      if (data.restaurants && data.restaurants.length > 0 && !data.quickReplies) {
         // Clear existing markers first
         setMarkers([]);
 
@@ -168,11 +171,31 @@ export default function Chat() {
         });
       }
 
+      // CLIENT-SIDE BOOKING LOCK: Track when we're in booking flow
+      // Enter booking flow when quickReplies appear (from collect_booking_info)
+      if (data.quickReplies && data.quickReplies.length > 0) {
+        setIsInBookingFlow(true);
+      }
+      // Exit booking flow when booking is complete (confirmed) or there's a booking summary with confirm action
+      if (data.bookingSummary && data.quickReplies?.some((r: { action?: string }) => r.action === 'confirm_booking')) {
+        // Still in booking flow until confirmed
+      } else if (!data.quickReplies && !data.bookingSummary && isInBookingFlow) {
+        // If we're in booking flow but this response has no quick replies or summary,
+        // check if it looks like a normal search response - if so, we exited booking
+        if (data.restaurants && data.restaurants.length > 0) {
+          setIsInBookingFlow(false);
+        }
+      }
+
+      // STRICTER FILTERING: If quickReplies exist (booking flow), ignore any restaurants
+      // This prevents restaurant cards from appearing during booking conversations
+      const filteredRestaurants = data.quickReplies ? undefined : data.restaurants;
+
       // Update assistant message
       updateLastMessage({
         content: data.content,
         toolCalls: data.toolCalls,
-        restaurants: data.restaurants,
+        restaurants: filteredRestaurants,
         reservation: updatedReservation,
         quickReplies: data.quickReplies,
         bookingSummary: data.bookingSummary,
@@ -199,6 +222,7 @@ export default function Chat() {
       // Open booking modal for final confirmation
       setCalendarCheckAfterMessageId(null); // Clear calendar check
       updateBookingContext({ step: 'confirming' });
+      setIsInBookingFlow(false); // Reset booking flow lock when confirming
       openBookingModal(bookingContext.restaurant);
     } else if (reply.action === 'change_details') {
       // Let user type what they want to change
@@ -649,6 +673,8 @@ function MessageBubble({ message, isLoading, onQuickReply, isLastMessage }: { me
   const isUser = message.role === 'user';
   const showLoading = isLoading && isLastMessage && !message.content;
   const buttonsActive = isLastMessage && !isLoading;
+  // Get global booking flow state to hide restaurant cards during booking
+  const isInBookingFlow = useAppStore((state) => state.isInBookingFlow);
 
   return (
     <motion.div
@@ -770,7 +796,8 @@ function MessageBubble({ message, isLoading, onQuickReply, isLastMessage }: { me
             )}
 
             {/* Restaurant cards - horizontal scroll (don't show during booking flow) */}
-            {message.restaurants && message.restaurants.length > 0 && !message.quickReplies && !message.bookingSummary && (
+            {/* Additional guard: also hide if global isInBookingFlow is true */}
+            {message.restaurants && message.restaurants.length > 0 && !message.quickReplies && !message.bookingSummary && !isInBookingFlow && (
               <div className="mt-2 -mr-4 md:-mr-6 h-[360px] md:h-[420px]">
                 <div className="flex gap-3 overflow-x-auto overflow-y-hidden h-full pb-2 pr-4 md:pr-6 scrollbar-hide snap-x snap-mandatory">
                   {message.restaurants.map((restaurant, index) => (

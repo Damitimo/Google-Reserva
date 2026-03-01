@@ -285,7 +285,14 @@ You: [call collect_booking_info with all info] "Perfect! Here's your booking sum
 
 CRITICAL: You MUST call collect_booking_info at EVERY step - each response in the booking flow requires calling this tool with ALL previously collected info plus any new info. The quick reply buttons only appear if you call this tool.
 
-IMPORTANT: Once a user starts booking a restaurant (says "book X" or similar), do NOT call search_restaurants again. Only use collect_booking_info. The restaurant cards should NOT appear during the booking conversation - only the quick reply buttons and booking summary should appear.
+CRITICAL RULE - NO RESTAURANT SEARCHES DURING BOOKING:
+Once a user starts booking a restaurant (says "book X" or clicks to book), you MUST NOT call search_restaurants again until the booking is complete or explicitly cancelled. This rule applies even when:
+- User provides party size (e.g., "4 people", "2") - use collect_booking_info, NOT search_restaurants
+- User provides date (e.g., "tomorrow", "tonight", "Saturday") - use collect_booking_info, NOT search_restaurants
+- User provides time (e.g., "7 PM", "around 8") - use collect_booking_info, NOT search_restaurants
+- User says anything during the booking flow - ALWAYS use collect_booking_info
+
+ONLY use collect_booking_info during booking. Restaurant cards should NOT appear during booking - only quick reply buttons and booking summary.
 
 Remember: You're not just searching, you're curating an experience. Every recommendation should feel personal and considered.`;
 }
@@ -627,9 +634,89 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
   }
 }
 
+// Helper function to detect if we're in an active booking flow
+function isBookingFlowActive(messages: Array<{ role: string; content: string }>): boolean {
+  // Look at the last few messages to detect booking context
+  const recentMessages = messages.slice(-8);
+
+  // Strong indicators that we're in a booking flow
+  const strongBookingStart = [
+    /\bbook\b/i,                    // "book", "Book it", "book that"
+    /\breserve\b/i,                 // "reserve", "make a reservation"
+    /\bI('ll| will)? take\b/i,      // "I'll take it", "I'll take that one"
+  ];
+
+  // Questions the agent asks during booking
+  const agentBookingQuestions = [
+    /how many (people|guests)/i,
+    /what time/i,
+    /when would you like/i,
+    /what date/i,
+    /party size/i,
+  ];
+
+  // User responses during booking (short answers)
+  const userBookingResponses = [
+    /^\d+\s*(people|guests|persons)?$/i,  // "4", "4 people"
+    /^(tonight|tomorrow|today|this weekend|next \w+)$/i,  // date responses
+    /^\d{1,2}(:\d{2})?\s*(am|pm)?$/i,     // "7", "7:30", "7:30 PM"
+    /^(2|two|3|three|4|four|5|five|6|six)\s*(people)?$/i,  // written numbers
+  ];
+
+  let hasBookingStart = false;
+  let hasAgentQuestion = false;
+  let hasUserResponse = false;
+
+  for (const msg of recentMessages) {
+    const content = msg.content.trim();
+
+    // Check for booking initiation
+    for (const pattern of strongBookingStart) {
+      if (pattern.test(content)) {
+        hasBookingStart = true;
+        break;
+      }
+    }
+
+    // Check for agent's booking questions
+    if (msg.role === 'assistant') {
+      for (const pattern of agentBookingQuestions) {
+        if (pattern.test(content)) {
+          hasAgentQuestion = true;
+          break;
+        }
+      }
+    }
+
+    // Check for user's booking responses (typically short)
+    if (msg.role === 'user' && content.length < 30) {
+      for (const pattern of userBookingResponses) {
+        if (pattern.test(content)) {
+          hasUserResponse = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // We're in booking flow if:
+  // 1. User started booking AND agent asked a question, OR
+  // 2. Agent asked a booking question AND user gave a booking response
+  const inBookingFlow = (hasBookingStart && hasAgentQuestion) || (hasAgentQuestion && hasUserResponse);
+
+  if (inBookingFlow) {
+    console.log('[Booking Detection] In booking flow:', { hasBookingStart, hasAgentQuestion, hasUserResponse });
+  }
+
+  return inBookingFlow;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { messages } = await request.json();
+
+    // Detect if we're in an active booking flow
+    const inBookingFlow = isBookingFlowActive(messages);
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
@@ -663,6 +750,22 @@ export async function POST(request: NextRequest) {
       const functionResponses: FunctionResponsePart[] = [];
 
       for (const call of funcCalls) {
+        // SERVER-SIDE ENFORCEMENT: Block search_restaurants during active booking flow
+        if (call.name === 'search_restaurants' && inBookingFlow) {
+          console.log('[Booking Guard] Blocked search_restaurants during active booking flow');
+          // Return a message telling the LLM to use collect_booking_info instead
+          functionResponses.push({
+            functionResponse: {
+              name: call.name,
+              response: {
+                blocked: true,
+                message: 'Cannot search for restaurants during an active booking. Please use collect_booking_info to continue the current booking conversation.',
+              },
+            },
+          });
+          continue; // Skip executing this tool
+        }
+
         const toolResult = await executeTool(call.name, call.args as Record<string, unknown>);
         toolCalls.push({
           name: call.name,

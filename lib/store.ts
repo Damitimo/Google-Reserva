@@ -17,6 +17,10 @@ interface AppStore {
   addMessage: (message: Message) => void;
   updateLastMessage: (updates: Partial<Message>) => void;
 
+  // Booking flow lock - prevents restaurant cards from showing during booking
+  isInBookingFlow: boolean;
+  setIsInBookingFlow: (inFlow: boolean) => void;
+
   // Pending booking chat (triggered from restaurant card)
   pendingBookingMessage: string | null;
   triggerBookingChat: (restaurantName: string, time?: string) => void;
@@ -80,6 +84,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
       return { messages };
     }),
+
+  // Booking flow lock - prevents restaurant cards from showing during booking
+  isInBookingFlow: false,
+  setIsInBookingFlow: (inFlow) => set({ isInBookingFlow: inFlow }),
 
   // Pending booking chat (triggered from restaurant card)
   pendingBookingMessage: null,
