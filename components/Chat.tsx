@@ -191,15 +191,22 @@ export default function Chat() {
       // This prevents restaurant cards from appearing during booking conversations
       const filteredRestaurants = data.quickReplies ? undefined : data.restaurants;
 
-      // Update assistant message
+      // Update assistant message - ensure there's always some content
+      const finalContent = data.content || (data.quickReplies ? '' : "I'm processing your request...");
+
       updateLastMessage({
-        content: data.content,
+        content: finalContent,
         toolCalls: data.toolCalls,
         restaurants: filteredRestaurants,
         reservation: updatedReservation,
         quickReplies: data.quickReplies,
         bookingSummary: data.bookingSummary,
       });
+
+      // Debug log for live issues
+      if (!data.content) {
+        console.warn('API returned empty content:', data);
+      }
     } catch (error) {
       console.error('Chat error:', error);
       updateLastMessage({
