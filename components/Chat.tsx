@@ -154,14 +154,15 @@ export default function Chat() {
   };
 
   // Speak new assistant messages (only the last one when loading finishes)
+  // Skip if voice mode is open (Live API handles audio there)
   useEffect(() => {
-    if (!isLoading && messages.length > 0) {
+    if (!isLoading && messages.length > 0 && !showVoiceMode) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage.role === 'assistant' && lastMessage.content && ttsEnabled) {
         speakText(lastMessage.content);
       }
     }
-  }, [isLoading, messages.length]);
+  }, [isLoading, messages.length, showVoiceMode]);
 
   // Auto-submit when a booking is triggered from restaurant card
   useEffect(() => {
