@@ -27,6 +27,7 @@ export default function VoiceMode({ isOpen, onClose }: VoiceModeProps) {
   const playerRef = useRef<AudioPlayer | null>(null);
   const vadRef = useRef<VoiceActivityDetector | null>(null);
   const responseRef = useRef<string>('');
+  const isConnectingRef = useRef(false); // Prevent multiple connections
 
   const addMessage = useAppStore((state) => state.addMessage);
 
@@ -82,6 +83,13 @@ Remember this is a voice conversation, so be natural and conversational.`;
 
     // Connect to Live API
     const connect = async () => {
+      // Prevent multiple simultaneous connections
+      if (isConnectingRef.current || clientRef.current?.connected) {
+        console.log('[VoiceMode] Already connecting or connected, skipping');
+        return;
+      }
+      isConnectingRef.current = true;
+
       try {
         setVoiceState('connecting');
         setError(null);
@@ -169,6 +177,7 @@ Remember this is a voice conversation, so be natural and conversational.`;
         const errorMsg = err instanceof Error ? err.message : String(err);
         setError(`Connection failed: ${errorMsg}`);
         setVoiceState('idle');
+        isConnectingRef.current = false;
       }
     };
 
@@ -180,6 +189,7 @@ Remember this is a voice conversation, so be natural and conversational.`;
       player.dispose();
       clientRef.current?.disconnect();
       vad.reset();
+      isConnectingRef.current = false;
     };
   }, [isOpen]);
 
