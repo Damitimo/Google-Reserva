@@ -13,6 +13,7 @@ export class AudioRecorder {
   private sourceNode: MediaStreamAudioSourceNode | null = null;
   private onAudioData: ((pcmData: ArrayBuffer) => void) | null = null;
   private isRecording = false;
+  private isMuted = false; // Mute while AI is speaking to prevent echo
 
   /**
    * Start recording from microphone
@@ -22,13 +23,14 @@ export class AudioRecorder {
     this.onAudioData = onAudioData;
 
     try {
-      // Request microphone access
+      // Request microphone access with strong echo cancellation
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
           sampleRate: 16000,
           echoCancellation: true,
           noiseSuppression: true,
+          autoGainControl: true,
         },
       });
 
@@ -42,7 +44,7 @@ export class AudioRecorder {
       const processorNode = this.audioContext.createScriptProcessor(4096, 1, 1);
 
       processorNode.onaudioprocess = (event) => {
-        if (!this.isRecording) return;
+        if (!this.isRecording || this.isMuted) return;
 
         const inputData = event.inputBuffer.getChannelData(0);
         const pcmData = this.float32ToPCM16(inputData);
@@ -90,6 +92,27 @@ export class AudioRecorder {
    */
   get recording(): boolean {
     return this.isRecording;
+  }
+
+  /**
+   * Mute the microphone (stop sending audio)
+   */
+  mute(): void {
+    this.isMuted = true;
+  }
+
+  /**
+   * Unmute the microphone (resume sending audio)
+   */
+  unmute(): void {
+    this.isMuted = false;
+  }
+
+  /**
+   * Check if muted
+   */
+  get muted(): boolean {
+    return this.isMuted;
   }
 
   /**

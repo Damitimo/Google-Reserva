@@ -60,10 +60,16 @@ Remember this is a voice conversation, so be natural and conversational.`;
     playerRef.current = player;
     vadRef.current = vad;
 
-    // Set up player callbacks
+    // Set up player callbacks - mute mic while speaking to prevent echo
     player.setCallbacks(
-      () => setVoiceState('speaking'),
-      () => setVoiceState('listening')
+      () => {
+        setVoiceState('speaking');
+        recorderRef.current?.mute(); // Mute mic while AI speaks
+      },
+      () => {
+        setVoiceState('listening');
+        recorderRef.current?.unmute(); // Unmute when AI stops
+      }
     );
 
     // Set up VAD callbacks
@@ -154,10 +160,15 @@ Remember this is a voice conversation, so be natural and conversational.`;
 
         // Start recording
         let audioChunkCount = 0;
+        let lastLevelUpdate = 0;
         await recorder.start((pcmData) => {
-          // Calculate audio level for visualization
-          const level = calculateAudioLevel(pcmData);
-          setAudioLevel(level);
+          // Calculate audio level for visualization (throttled to ~10fps)
+          const now = Date.now();
+          if (now - lastLevelUpdate > 100) {
+            const level = calculateAudioLevel(pcmData);
+            setAudioLevel(level);
+            lastLevelUpdate = now;
+          }
 
           // Process VAD
           vad.process(pcmData);
@@ -166,8 +177,8 @@ Remember this is a voice conversation, so be natural and conversational.`;
           client.sendAudio(pcmData);
 
           audioChunkCount++;
-          if (audioChunkCount % 50 === 0) {
-            console.log('[VoiceMode] Sent', audioChunkCount, 'audio chunks, level:', level.toFixed(3));
+          if (audioChunkCount % 100 === 0) {
+            console.log('[VoiceMode] Sent', audioChunkCount, 'audio chunks');
           }
         });
 
@@ -246,11 +257,12 @@ Remember this is a voice conversation, so be natural and conversational.`;
               background: 'linear-gradient(135deg, rgba(66, 133, 244, 0.2), rgba(155, 114, 203, 0.2), rgba(217, 101, 112, 0.2))',
             }}
             animate={{
-              scale: voiceState === 'listening' ? [1, 1.1 + audioLevel * 0.3, 1] : voiceState === 'speaking' ? [1, 1.15, 1] : 1,
+              scale: voiceState === 'listening' ? 1 + audioLevel * 0.2 : voiceState === 'speaking' ? [1, 1.15, 1] : 1,
             }}
             transition={{
-              duration: voiceState === 'speaking' ? 0.5 : 0.15,
-              repeat: voiceState !== 'idle' && voiceState !== 'connecting' ? Infinity : 0,
+              duration: voiceState === 'speaking' ? 0.8 : 0.3,
+              repeat: voiceState === 'speaking' ? Infinity : 0,
+              ease: 'easeOut',
             }}
           />
           <motion.div
@@ -259,12 +271,13 @@ Remember this is a voice conversation, so be natural and conversational.`;
               background: 'linear-gradient(135deg, rgba(66, 133, 244, 0.3), rgba(155, 114, 203, 0.3), rgba(217, 101, 112, 0.3))',
             }}
             animate={{
-              scale: voiceState === 'listening' ? [1, 1.15 + audioLevel * 0.4, 1] : voiceState === 'speaking' ? [1, 1.2, 1] : 1,
+              scale: voiceState === 'listening' ? 1 + audioLevel * 0.25 : voiceState === 'speaking' ? [1, 1.2, 1] : 1,
             }}
             transition={{
-              duration: voiceState === 'speaking' ? 0.4 : 0.12,
-              repeat: voiceState !== 'idle' && voiceState !== 'connecting' ? Infinity : 0,
-              delay: 0.05,
+              duration: voiceState === 'speaking' ? 0.7 : 0.3,
+              repeat: voiceState === 'speaking' ? Infinity : 0,
+              delay: voiceState === 'speaking' ? 0.1 : 0,
+              ease: 'easeOut',
             }}
           />
           <motion.div
@@ -273,12 +286,13 @@ Remember this is a voice conversation, so be natural and conversational.`;
               background: 'linear-gradient(135deg, rgba(66, 133, 244, 0.5), rgba(155, 114, 203, 0.5), rgba(217, 101, 112, 0.5))',
             }}
             animate={{
-              scale: voiceState === 'listening' ? [1, 1.2 + audioLevel * 0.5, 1] : voiceState === 'speaking' ? [1, 1.25, 1] : 1,
+              scale: voiceState === 'listening' ? 1 + audioLevel * 0.3 : voiceState === 'speaking' ? [1, 1.25, 1] : 1,
             }}
             transition={{
-              duration: voiceState === 'speaking' ? 0.3 : 0.1,
-              repeat: voiceState !== 'idle' && voiceState !== 'connecting' ? Infinity : 0,
-              delay: 0.1,
+              duration: voiceState === 'speaking' ? 0.6 : 0.3,
+              repeat: voiceState === 'speaking' ? Infinity : 0,
+              delay: voiceState === 'speaking' ? 0.2 : 0,
+              ease: 'easeOut',
             }}
           />
 
