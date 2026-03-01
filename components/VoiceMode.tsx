@@ -102,9 +102,11 @@ Remember this is a voice conversation, so be natural and conversational.`;
         clientRef.current = client;
 
         await client.connect();
+        console.log('[VoiceMode] Connected to Gemini Live API');
 
         // Set up event listeners
         client.on('audio', (audioData) => {
+          console.log('[VoiceMode] Received audio, adding to player');
           player.addToQueue(audioData as ArrayBuffer);
         });
 
@@ -133,8 +135,9 @@ Remember this is a voice conversation, so be natural and conversational.`;
         });
 
         client.on('error', (err) => {
-          console.error('[VoiceMode] Error:', err);
+          console.error('[VoiceMode] Client error:', err);
           setError('Connection error. Please try again.');
+          setVoiceState('idle');
         });
 
         client.on('close', () => {
@@ -142,6 +145,7 @@ Remember this is a voice conversation, so be natural and conversational.`;
         });
 
         // Start recording
+        let audioChunkCount = 0;
         await recorder.start((pcmData) => {
           // Calculate audio level for visualization
           const level = calculateAudioLevel(pcmData);
@@ -152,12 +156,18 @@ Remember this is a voice conversation, so be natural and conversational.`;
 
           // Send audio to API
           client.sendAudio(pcmData);
+
+          audioChunkCount++;
+          if (audioChunkCount % 50 === 0) {
+            console.log('[VoiceMode] Sent', audioChunkCount, 'audio chunks, level:', level.toFixed(3));
+          }
         });
 
         setVoiceState('listening');
       } catch (err) {
         console.error('[VoiceMode] Connection failed:', err);
-        setError('Failed to connect. Check your API key and try again.');
+        const errorMsg = err instanceof Error ? err.message : String(err);
+        setError(`Connection failed: ${errorMsg}`);
         setVoiceState('idle');
       }
     };

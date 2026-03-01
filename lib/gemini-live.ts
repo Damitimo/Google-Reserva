@@ -45,10 +45,13 @@ export class GeminiLiveClient {
   private isConnected = false;
   private audioQueue: ArrayBuffer[] = [];
 
+  private setupComplete = false;
+  private setupPromiseResolve: (() => void) | null = null;
+
   constructor(apiKey: string, config: LiveAPIConfig = {}) {
     this.apiKey = apiKey;
     this.config = {
-      model: config.model || 'gemini-2.0-flash-live-001',
+      model: config.model || 'gemini-2.5-flash-native-audio-latest', // Supports bidiGenerateContent
       systemInstruction: config.systemInstruction,
       voiceName: config.voiceName || 'Aoede', // Female voice
       tools: config.tools,
@@ -60,32 +63,74 @@ export class GeminiLiveClient {
    */
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
+      // Use v1beta for the Live API
       const wsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=${this.apiKey}`;
 
-      this.ws = new WebSocket(wsUrl);
+      console.log('[GeminiLive] Connecting to:', wsUrl.replace(this.apiKey, 'API_KEY_HIDDEN'));
+
+      try {
+        this.ws = new WebSocket(wsUrl);
+      } catch (e) {
+        console.error('[GeminiLive] WebSocket creation failed:', e);
+        reject(e);
+        return;
+      }
+
+      console.log('[GeminiLive] WebSocket created, readyState:', this.ws.readyState);
+
+      // Timeout for connection
+      const connectionTimeout = setTimeout(() => {
+        if (this.ws?.readyState !== WebSocket.OPEN) {
+          console.error('[GeminiLive] Connection timed out, readyState:', this.ws?.readyState);
+          this.disconnect();
+          reject(new Error('Connection timed out'));
+        }
+      }, 5000);
+
+      // Timeout for setup
+      const setupTimeout = setTimeout(() => {
+        if (!this.setupComplete) {
+          console.error('[GeminiLive] Setup timed out after connection');
+          this.disconnect();
+          reject(new Error('Setup timed out'));
+        }
+      }, 10000);
 
       this.ws.onopen = () => {
-        console.log('[GeminiLive] WebSocket connected');
+        console.log('[GeminiLive] WebSocket OPEN');
+        clearTimeout(connectionTimeout);
         this.sendSetup();
         this.isConnected = true;
-        this.emit('open');
-        resolve();
+
+        // Wait for setup complete before resolving
+        this.setupPromiseResolve = () => {
+          clearTimeout(setupTimeout);
+          resolve();
+        };
       };
 
       this.ws.onclose = (event) => {
         console.log('[GeminiLive] WebSocket closed', event.code, event.reason);
+        clearTimeout(setupTimeout);
         this.isConnected = false;
+        this.setupComplete = false;
         this.emit('close', event);
       };
 
       this.ws.onerror = (error) => {
         console.error('[GeminiLive] WebSocket error', error);
+        clearTimeout(setupTimeout);
         this.emit('error', error);
         reject(error);
       };
 
-      this.ws.onmessage = (event) => {
-        this.handleMessage(event.data);
+      this.ws.onmessage = async (event) => {
+        // Handle both text and blob data
+        let data = event.data;
+        if (data instanceof Blob) {
+          data = await data.text();
+        }
+        this.handleMessage(data);
       };
     });
   }
@@ -94,32 +139,24 @@ export class GeminiLiveClient {
    * Send initial setup message with configuration
    */
   private sendSetup(): void {
-    const setupMessage: Record<string, unknown> = {
-      setup: {
-        model: `models/${this.config.model}`,
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: {
-                voiceName: this.config.voiceName,
-              },
-            },
-          },
-        },
+    // Setup for native audio model
+    const setup: Record<string, unknown> = {
+      model: `models/${this.config.model}`,
+      generationConfig: {
+        responseModalities: ['AUDIO'],
       },
     };
 
+    // System instruction as Content object
     if (this.config.systemInstruction) {
-      (setupMessage.setup as Record<string, unknown>).systemInstruction = {
+      setup.systemInstruction = {
+        role: 'user',
         parts: [{ text: this.config.systemInstruction }],
       };
     }
 
-    if (this.config.tools) {
-      (setupMessage.setup as Record<string, unknown>).tools = this.config.tools;
-    }
-
+    const setupMessage = { setup };
+    console.log('[GeminiLive] Sending setup:', JSON.stringify(setupMessage, null, 2).substring(0, 500));
     this.send(setupMessage);
   }
 
@@ -128,29 +165,41 @@ export class GeminiLiveClient {
    */
   private handleMessage(data: string | ArrayBuffer): void {
     try {
+      console.log('[GeminiLive] Raw message received:', typeof data === 'string' ? data.substring(0, 300) : 'ArrayBuffer');
       const message = JSON.parse(data as string);
+      console.log('[GeminiLive] Parsed message keys:', Object.keys(message));
 
       // Setup complete
       if (message.setupComplete) {
-        console.log('[GeminiLive] Setup complete');
+        console.log('[GeminiLive] Setup complete!');
+        this.setupComplete = true;
+        this.emit('open');
+        if (this.setupPromiseResolve) {
+          this.setupPromiseResolve();
+          this.setupPromiseResolve = null;
+        }
         return;
       }
 
       // Server content (audio/text response)
       if (message.serverContent) {
         const content = message.serverContent;
+        console.log('[GeminiLive] Server content:', JSON.stringify(content).substring(0, 200));
 
         // Model turn (response in progress)
         if (content.modelTurn?.parts) {
           for (const part of content.modelTurn.parts) {
-            // Audio response
-            if (part.inlineData?.mimeType?.startsWith('audio/')) {
-              const audioData = this.base64ToArrayBuffer(part.inlineData.data);
-              this.audioQueue.push(audioData);
-              this.emit('audio', audioData);
+            // Audio response - check both inlineData and direct audio field
+            const audioData = part.inlineData || part.audio;
+            if (audioData?.mimeType?.startsWith('audio/') || audioData?.data) {
+              console.log('[GeminiLive] Received audio chunk');
+              const buffer = this.base64ToArrayBuffer(audioData.data);
+              this.audioQueue.push(buffer);
+              this.emit('audio', buffer);
             }
             // Text response
             if (part.text) {
+              console.log('[GeminiLive] Received text:', part.text.substring(0, 50));
               this.emit('text', part.text);
             }
           }
@@ -158,13 +207,21 @@ export class GeminiLiveClient {
 
         // Turn complete
         if (content.turnComplete) {
+          console.log('[GeminiLive] Turn complete');
           this.emit('turn_complete');
         }
 
         // Interrupted (user started speaking)
         if (content.interrupted) {
+          console.log('[GeminiLive] Interrupted by user');
           this.emit('interrupted');
         }
+      }
+
+      // Handle error responses
+      if (message.error) {
+        console.error('[GeminiLive] API Error:', message.error);
+        this.emit('error', new Error(message.error.message || 'API Error'));
       }
 
       // Tool call
@@ -187,16 +244,17 @@ export class GeminiLiveClient {
    * @param pcmData - 16-bit PCM audio at 16kHz
    */
   sendAudio(pcmData: ArrayBuffer): void {
-    if (!this.isConnected || !this.ws) return;
+    if (!this.isConnected || !this.ws || !this.setupComplete) return;
 
     const base64Audio = this.arrayBufferToBase64(pcmData);
 
+    // Use the new format with audio field directly (mediaChunks is deprecated)
     this.send({
       realtimeInput: {
-        mediaChunks: [{
+        audio: {
           mimeType: 'audio/pcm;rate=16000',
           data: base64Audio,
-        }],
+        },
       },
     });
   }
