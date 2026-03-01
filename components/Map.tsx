@@ -36,25 +36,30 @@ function RestaurantMarker({
         }}
         className={`relative cursor-pointer ${isSelected ? 'z-50' : 'z-10'}`}
       >
-        {/* Pin */}
+        {/* Pin with Gemini gradient border */}
         <div
           className={`
             w-10 h-10 rounded-full flex items-center justify-center
             shadow-lg transition-all duration-200
-            ${isSelected
-              ? 'bg-google-red scale-125'
-              : 'bg-white border-2 border-google-red hover:scale-110'
-            }
+            ${isSelected ? 'scale-125' : 'hover:scale-110'}
           `}
+          style={{
+            background: isSelected
+              ? 'linear-gradient(135deg, #4285F4, #9B72CB, #D96570)'
+              : 'linear-gradient(135deg, #4285F4, #9B72CB, #D96570)',
+            padding: '2px',
+          }}
         >
-          <span className={`font-bold text-sm ${isSelected ? 'text-white' : 'text-google-red'}`}>
-            {index + 1}
-          </span>
+          <div className={`w-full h-full rounded-full flex items-center justify-center ${isSelected ? 'bg-transparent' : 'bg-white'}`}>
+            <span className={`font-bold text-sm ${isSelected ? 'text-white' : 'text-gray-800'}`}>
+              {index + 1}
+            </span>
+          </div>
         </div>
 
         {/* Pulse effect for selected */}
         {isSelected && (
-          <div className="absolute inset-0 rounded-full bg-google-red/30 animate-ping" />
+          <div className="absolute inset-0 rounded-full bg-[#9B72CB]/30 animate-ping" />
         )}
 
         {/* Info popup on hover/select */}

@@ -5,7 +5,7 @@ import { useAppStore } from '@/lib/store';
 import { Message, Restaurant, Reservation, QuickReply } from '@/types';
 import RestaurantCard from './RestaurantCard';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Mic, Sparkles, Calendar, Users, MapPin, Edit3, X, CheckCircle2, XCircle, CreditCard, Clock, ChevronDown, Shield } from 'lucide-react';
+import { Send, Mic, Sparkles, Calendar, Users, MapPin, Edit3, X, CheckCircle2, XCircle, CreditCard, Clock, ChevronDown, Shield, AlertTriangle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 // Module-level lock to prevent double booking submissions (survives React re-renders)
@@ -699,6 +699,31 @@ function MessageBubble({ message, isLoading, onQuickReply, isLastMessage }: { me
           </div>
         ) : (
           <div className="space-y-3">
+            {/* Merchant agent message (unhappy flow) */}
+            {message.merchantAgent && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div className="flex-1">
+                    <span className="text-xs font-medium text-gray-900">
+                      {message.merchantAgent.name}
+                    </span>
+                    <p className="text-sm text-gray-800 mt-1">{message.merchantAgent.message}</p>
+                  </div>
+                </div>
+                {/* Refund status for cancellations */}
+                {message.merchantAgent.type === 'cancellation' && (
+                  <div className="mt-3 pt-3 border-t border-amber-200 flex items-center gap-2">
+                    <CreditCard className="w-3.5 h-3.5 text-gray-500" />
+                    <span className="text-xs text-gray-600">Deposit refund in progress</span>
+                    <span className="text-xs text-gray-400">• within 24 hours</span>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Text content */}
             {message.content && (
               <div className="bg-gray-100 rounded-2xl rounded-bl-md px-4 py-3">

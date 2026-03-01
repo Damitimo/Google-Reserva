@@ -5,6 +5,8 @@ import Chat from '@/components/Chat';
 import BookingModal from '@/components/BookingModal';
 import ReviewsModal from '@/components/ReviewsModal';
 import MapModal from '@/components/MapModal';
+import MerchantNotification from '@/components/MerchantNotification';
+import ChromeFrame from '@/components/ChromeFrame';
 
 // Dynamically import Map to avoid SSR issues with Google Maps
 const Map = dynamic(() => import('@/components/Map'), {
@@ -16,9 +18,9 @@ const Map = dynamic(() => import('@/components/Map'), {
   ),
 });
 
-export default function Home() {
+function AppContent() {
   return (
-    <main className="h-screen w-screen overflow-hidden bg-gray-100 overflow-x-hidden">
+    <main className="h-full w-full overflow-hidden bg-gray-100 overflow-x-hidden">
       {/* Desktop/Tablet Layout - Map + Chat side by side */}
       <div className="hidden md:flex h-full p-4 gap-4">
         {/* Map - Left Side */}
@@ -45,6 +47,27 @@ export default function Home() {
 
       {/* Map Modal (mobile) */}
       <MapModal />
+
+      {/* Merchant Notification (unhappy flow) */}
+      <MerchantNotification />
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <>
+      {/* Desktop: Wrap in Chrome frame */}
+      <div className="hidden md:block h-screen w-screen">
+        <ChromeFrame>
+          <AppContent />
+        </ChromeFrame>
+      </div>
+
+      {/* Mobile: No Chrome frame */}
+      <div className="md:hidden h-screen w-screen">
+        <AppContent />
+      </div>
+    </>
   );
 }

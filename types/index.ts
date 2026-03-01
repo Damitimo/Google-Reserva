@@ -74,16 +74,23 @@ export interface BookingSummary {
   depositPolicy?: DepositPolicy | null;
 }
 
+export interface MerchantAgentMessage {
+  name: string;
+  message: string;
+  type: 'cancellation' | 'modification' | 'alert';
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  timestamp: Date;
+  timestamp?: Date;
   toolCalls?: ToolCall[];
   restaurants?: Restaurant[];
   reservation?: Reservation;
   quickReplies?: QuickReply[];
   bookingSummary?: BookingSummary;
+  merchantAgent?: MerchantAgentMessage;
 }
 
 export interface ToolCall {

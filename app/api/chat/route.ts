@@ -639,6 +639,27 @@ function isBookingFlowActive(messages: Array<{ role: string; content: string }>)
   // Look at the last few messages to detect booking context
   const recentMessages = messages.slice(-8);
 
+  // Check for cancellation - if a reservation was cancelled, we're NOT in booking flow
+  const cancellationIndicators = [
+    /cancel.*reservation/i,
+    /reservation.*cancel/i,
+    /unfortunately.*cancel/i,
+    /had to cancel/i,
+    /need to cancel/i,
+    /I just (heard|received word) from/i,  // Donna's cancellation message
+    /find.*alternative/i,
+    /Find me.*restaurants.*with availability/i,  // User searching after cancellation
+  ];
+
+  for (const msg of recentMessages.slice(-4)) {  // Check last 4 messages for cancellation
+    for (const pattern of cancellationIndicators) {
+      if (pattern.test(msg.content)) {
+        console.log('[Booking Detection] Cancellation detected, not in booking flow');
+        return false;
+      }
+    }
+  }
+
   // Strong indicators that we're in a booking flow
   const strongBookingStart = [
     /\bbook\b/i,                    // "book", "Book it", "book that"

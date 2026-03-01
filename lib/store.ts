@@ -11,11 +11,28 @@ export interface BookingContext {
   step: 'idle' | 'collecting' | 'confirming' | 'processing' | 'confirmed';
 }
 
+// Notification for merchant agent messages (unhappy flow)
+export interface MerchantNotification {
+  id: string;
+  type: 'cancellation' | 'modification' | 'alert';
+  title: string;
+  message: string;
+  restaurantName: string;
+  timestamp: Date;
+  reservation?: Reservation;
+}
+
 interface AppStore {
   // Messages
   messages: Message[];
   addMessage: (message: Message) => void;
   updateLastMessage: (updates: Partial<Message>) => void;
+
+  // Merchant notifications (unhappy flow)
+  merchantNotification: MerchantNotification | null;
+  showMerchantNotification: (notification: MerchantNotification) => void;
+  dismissMerchantNotification: () => void;
+  handleNotificationClick: () => void;
 
   // Booking flow lock - prevents restaurant cards from showing during booking
   isInBookingFlow: boolean;
@@ -84,6 +101,56 @@ export const useAppStore = create<AppStore>((set, get) => ({
       }
       return { messages };
     }),
+
+  // Merchant notifications (unhappy flow)
+  merchantNotification: null,
+  showMerchantNotification: (notification) => set({ merchantNotification: notification }),
+  dismissMerchantNotification: () => set({ merchantNotification: null }),
+  handleNotificationClick: () => {
+    const { merchantNotification, addMessage, dismissMerchantNotification, setIsInBookingFlow, resetBookingContext, setCurrentReservation } = get();
+    if (!merchantNotification) return;
+
+    // Reset booking flow state since the reservation was cancelled
+    setIsInBookingFlow(false);
+    resetBookingContext();
+    setCurrentReservation(null);
+
+    // Add merchant agent message to chat
+    const merchantMessage: Message = {
+      id: `merchant-${Date.now()}`,
+      role: 'assistant',
+      content: '',
+      merchantAgent: {
+        name: merchantNotification.restaurantName,
+        message: merchantNotification.type === 'cancellation'
+          ? `We're very sorry, but we need to cancel your reservation for ${merchantNotification.reservation?.partySize || 4} guests on ${merchantNotification.reservation?.date || 'the requested date'}. We had an unexpected private event booking that conflicts with your time slot. We sincerely apologize for the inconvenience.`
+          : merchantNotification.message,
+        type: merchantNotification.type,
+      },
+    };
+    addMessage(merchantMessage);
+
+    // Add Donna's response with rebooking options
+    setTimeout(() => {
+      const restaurant = merchantNotification.reservation?.restaurant;
+      const cuisine = restaurant?.cuisine || 'similar';
+      const location = restaurant?.address?.split(',')[1]?.trim() || 'nearby';
+
+      const donnaResponse: Message = {
+        id: `donna-rebook-${Date.now()}`,
+        role: 'assistant',
+        content: `I just received word from ${merchantNotification.restaurantName} that they unfortunately need to cancel your reservation. I'm so sorry about this!\n\nDon't worry though - I can help you find an alternative. Would you like me to:\n\n• **Rebook at ${merchantNotification.restaurantName}** for a different time\n• **Find similar restaurants** nearby that have availability\n• **Check your other saved options** from earlier`,
+        quickReplies: [
+          { label: `Rebook at ${merchantNotification.restaurantName}`, value: `I'd like to rebook at ${merchantNotification.restaurantName} for a different time` },
+          { label: 'Find similar restaurants', value: `Find me ${cuisine} restaurants ${location} with availability for ${merchantNotification.reservation?.partySize || 4} people ${merchantNotification.reservation?.date || 'tonight'}` },
+          { label: 'Show other options', value: 'Show me other restaurant options from my earlier search' },
+        ],
+      };
+      addMessage(donnaResponse);
+    }, 1500);
+
+    dismissMerchantNotification();
+  },
 
   // Booking flow lock - prevents restaurant cards from showing during booking
   isInBookingFlow: false,

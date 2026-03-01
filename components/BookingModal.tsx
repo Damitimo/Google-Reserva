@@ -49,6 +49,7 @@ export default function BookingModal() {
     addMessage,
     bookingContext,
     resetBookingContext,
+    showMerchantNotification,
   } = useAppStore();
 
   // Use booking context for values collected conversationally
@@ -139,6 +140,19 @@ export default function BookingModal() {
         timestamp: new Date(),
         reservation,
       });
+
+      // DEMO: Mock merchant cancellation notification after 8 seconds
+      setTimeout(() => {
+        showMerchantNotification({
+          id: `cancel-${Date.now()}`,
+          type: 'cancellation',
+          title: 'Reservation Update',
+          message: `${bookingRestaurant.name} needs to make a change to your booking`,
+          restaurantName: bookingRestaurant.name,
+          timestamp: new Date(),
+          reservation,
+        });
+      }, 15000);
     }
     resetBookingContext();
     closeBookingModal();
@@ -177,7 +191,7 @@ export default function BookingModal() {
           </div>
 
           {/* Content */}
-          <div className="p-4 md:p-6">
+          <div className={step === 'confirmed' ? 'p-4' : 'p-4 md:p-6'}>
             {step === 'linkPayment' && (
               <div className="py-6">
                 <div className="text-center mb-6">
@@ -346,9 +360,9 @@ export default function BookingModal() {
             )}
 
             {step === 'processing' && (
-              <div className="py-6 space-y-4">
+              <div className="py-2 space-y-3">
                 {/* UCP Protocol Badge */}
-                <div className="flex items-center justify-center gap-2 mb-4 py-2 px-3 bg-gray-50 rounded-lg mx-auto w-fit">
+                <div className="flex items-center justify-center gap-2 mb-2 py-1.5 px-3 bg-gray-50 rounded-lg mx-auto w-fit">
                   <div className="w-2 h-2 bg-google-green rounded-full animate-pulse" />
                   <span className="text-xs font-medium text-gray-600">Universal Commerce Protocol</span>
                 </div>
@@ -390,26 +404,26 @@ export default function BookingModal() {
             )}
 
             {step === 'confirmed' && (
-              <div className="text-center py-4">
+              <div className="text-center">
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-                  className="w-20 h-20 rounded-full bg-google-green/10 flex items-center justify-center mx-auto mb-4"
+                  className="w-16 h-16 rounded-full bg-google-green/10 flex items-center justify-center mx-auto mb-3"
                 >
-                  <CheckCircle2 className="w-10 h-10 text-google-green" />
+                  <CheckCircle2 className="w-8 h-8 text-google-green" />
                 </motion.div>
 
                 {/* UCP Gateway Badge */}
-                <div className="flex items-center justify-center gap-2 mb-4 py-2 px-3 bg-gray-50 rounded-lg mx-auto w-fit">
+                <div className="flex items-center justify-center gap-2 mb-3 py-1.5 px-3 bg-gray-50 rounded-lg mx-auto w-fit">
                   <div className="w-2 h-2 bg-google-green rounded-full" />
                   <span className="text-xs text-gray-500">Booked via</span>
                   <span className="text-xs font-medium text-gray-700">OpenTable</span>
                   <span className="text-xs text-gray-400">• UCP Gateway</span>
                 </div>
 
-                <div className="bg-gray-50 rounded-xl p-4 mb-4">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="bg-gray-50 rounded-xl p-3 mb-3">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <p className="text-gray-400">Date</p>
                       <p className="font-medium">{selectedDate}</p>
@@ -431,7 +445,7 @@ export default function BookingModal() {
 
                 {/* Deposit Info - only show if deposit was charged */}
                 {hasDeposit && (
-                  <div className="flex items-center justify-between bg-blue-50 rounded-lg px-4 py-3 mb-4">
+                  <div className="flex items-center justify-between bg-blue-50 rounded-lg px-3 py-2 mb-3">
                     <div className="flex items-center gap-2">
                       <CreditCard className="w-4 h-4 text-google-blue" />
                       <span className="text-sm text-gray-700">Deposit charged</span>
@@ -445,16 +459,16 @@ export default function BookingModal() {
                   </div>
                 )}
 
-                <p className="text-sm text-gray-500 mb-4">
+                <p className="text-xs text-gray-500 mb-3">
                   Confirmation sent to your phone
                 </p>
 
-                <div className="flex gap-3">
+                <div className="flex gap-2">
                   {calendarAdded ? (
                     <motion.div
                       initial={{ scale: 0.9, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      className="flex-1 flex items-center justify-center gap-2 py-3 bg-google-green/10 border border-google-green/20 rounded-xl"
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-google-green/10 border border-google-green/20 rounded-lg"
                     >
                       <Check className="w-4 h-4 text-google-green" />
                       <span className="text-sm font-medium text-google-green">Added to Calendar</span>
@@ -462,14 +476,14 @@ export default function BookingModal() {
                   ) : (
                     <button
                       onClick={handleAddToCalendar}
-                      className="flex-1 flex items-center justify-center gap-2 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       <CalendarPlus className="w-4 h-4 text-google-blue" />
                       <span className="text-sm font-medium">Add to Calendar</span>
                     </button>
                   )}
                   <button
-                    className="flex-1 flex items-center justify-center gap-2 py-3 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     <Share2 className="w-4 h-4 text-gray-600" />
                     <span className="text-sm font-medium">Share</span>
@@ -481,10 +495,10 @@ export default function BookingModal() {
 
           {/* Footer */}
           {step === 'confirmed' && (
-            <div className="p-4 md:p-6 border-t border-gray-100 bg-gray-50">
+            <div className="p-4 border-t border-gray-100 bg-gray-50">
               <button
                 onClick={handleDone}
-                className="w-full btn-primary py-3 text-base"
+                className="w-full btn-primary py-2.5 text-sm"
               >
                 Done
               </button>
