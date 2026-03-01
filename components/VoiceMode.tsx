@@ -385,15 +385,6 @@ Remember this is a voice conversation. Be natural and conversational.`;
         });
 
         setVoiceState('listening');
-
-        // Send initial greeting to start the conversation
-        // The model will respond with audio, starting the interaction
-        setTimeout(() => {
-          if (client.connected) {
-            client.sendText('Hello, I would like to make a dinner reservation for tomorrow at 7pm.');
-            console.log('[VoiceMode] Sent initial greeting to start conversation');
-          }
-        }, 1000);
       } catch (err) {
         console.error('[VoiceMode] Connection failed:', err);
         const errorMsg = err instanceof Error ? err.message : String(err);
