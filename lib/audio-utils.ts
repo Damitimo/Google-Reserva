@@ -131,15 +131,18 @@ export class AudioRecorder {
 
 /**
  * Audio Player - Plays back 24kHz 16-bit PCM audio
+ * Uses continuous scheduling to prevent gaps and crackling
  */
 export class AudioPlayer {
   private audioContext: AudioContext | null = null;
   private audioQueue: ArrayBuffer[] = [];
   private isPlaying = false;
-  private currentSource: AudioBufferSourceNode | null = null;
+  private scheduledSources: AudioBufferSourceNode[] = [];
   private nextPlayTime = 0;
   private onPlaybackStart: (() => void) | null = null;
   private onPlaybackEnd: (() => void) | null = null;
+  private scheduleInterval: NodeJS.Timeout | null = null;
+  private lastScheduledEndTime = 0;
 
   constructor() {
     // Initialize audio context at 24kHz for playback
@@ -162,53 +165,82 @@ export class AudioPlayer {
   addToQueue(pcmData: ArrayBuffer): void {
     this.audioQueue.push(pcmData);
     if (!this.isPlaying) {
-      this.playNext();
+      this.startPlayback();
     }
   }
 
   /**
-   * Play next audio chunk from queue
+   * Start continuous playback with scheduling
    */
-  private async playNext(): Promise<void> {
-    if (!this.audioContext || this.audioQueue.length === 0) {
-      this.isPlaying = false;
-      this.onPlaybackEnd?.();
-      return;
-    }
-
-    if (!this.isPlaying) {
-      this.isPlaying = true;
-      this.onPlaybackStart?.();
-      this.nextPlayTime = this.audioContext.currentTime;
-    }
+  private async startPlayback(): Promise<void> {
+    if (!this.audioContext || this.isPlaying) return;
 
     // Resume audio context if suspended
     if (this.audioContext.state === 'suspended') {
       await this.audioContext.resume();
     }
 
-    const pcmData = this.audioQueue.shift()!;
-    const audioBuffer = this.pcm16ToAudioBuffer(pcmData);
+    this.isPlaying = true;
+    this.onPlaybackStart?.();
+    this.nextPlayTime = this.audioContext.currentTime;
+    this.lastScheduledEndTime = this.nextPlayTime;
 
-    const source = this.audioContext.createBufferSource();
-    source.buffer = audioBuffer;
-    source.connect(this.audioContext.destination);
+    // Schedule chunks continuously every 50ms
+    this.scheduleChunks();
+    this.scheduleInterval = setInterval(() => this.scheduleChunks(), 50);
+  }
 
-    // Schedule playback
-    source.start(this.nextPlayTime);
-    this.nextPlayTime += audioBuffer.duration;
+  /**
+   * Schedule all queued audio chunks
+   */
+  private scheduleChunks(): void {
+    if (!this.audioContext) return;
 
-    // Queue next chunk
-    source.onended = () => {
-      if (this.audioQueue.length > 0) {
-        this.playNext();
-      } else {
-        this.isPlaying = false;
-        this.onPlaybackEnd?.();
-      }
-    };
+    const currentTime = this.audioContext.currentTime;
 
-    this.currentSource = source;
+    // Reset timing if we've fallen behind (prevents crackling from timing drift)
+    if (this.nextPlayTime < currentTime) {
+      this.nextPlayTime = currentTime + 0.01; // Small buffer
+    }
+
+    // Schedule all queued chunks
+    while (this.audioQueue.length > 0) {
+      const pcmData = this.audioQueue.shift()!;
+      const audioBuffer = this.pcm16ToAudioBuffer(pcmData);
+
+      const source = this.audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(this.audioContext.destination);
+
+      // Schedule playback
+      source.start(this.nextPlayTime);
+      this.nextPlayTime += audioBuffer.duration;
+      this.lastScheduledEndTime = this.nextPlayTime;
+
+      // Track source for cleanup
+      this.scheduledSources.push(source);
+      source.onended = () => {
+        const idx = this.scheduledSources.indexOf(source);
+        if (idx !== -1) this.scheduledSources.splice(idx, 1);
+
+        // Check if all playback is done
+        if (this.scheduledSources.length === 0 && this.audioQueue.length === 0) {
+          this.stopScheduler();
+        }
+      };
+    }
+  }
+
+  /**
+   * Stop the scheduler and signal playback end
+   */
+  private stopScheduler(): void {
+    if (this.scheduleInterval) {
+      clearInterval(this.scheduleInterval);
+      this.scheduleInterval = null;
+    }
+    this.isPlaying = false;
+    this.onPlaybackEnd?.();
   }
 
   /**
@@ -216,14 +248,22 @@ export class AudioPlayer {
    */
   stop(): void {
     this.audioQueue = [];
-    if (this.currentSource) {
+
+    // Stop scheduler
+    if (this.scheduleInterval) {
+      clearInterval(this.scheduleInterval);
+      this.scheduleInterval = null;
+    }
+
+    // Stop all scheduled sources
+    for (const source of this.scheduledSources) {
       try {
-        this.currentSource.stop();
+        source.stop();
       } catch {
         // Ignore if already stopped
       }
-      this.currentSource = null;
     }
+    this.scheduledSources = [];
     this.isPlaying = false;
     this.onPlaybackEnd?.();
   }

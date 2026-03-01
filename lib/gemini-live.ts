@@ -51,7 +51,8 @@ export class GeminiLiveClient {
   constructor(apiKey: string, config: LiveAPIConfig = {}) {
     this.apiKey = apiKey;
     this.config = {
-      model: config.model || 'gemini-2.5-flash-native-audio-latest', // Supports bidiGenerateContent
+      // Use model that supports both native audio and function calling
+      model: config.model || 'gemini-2.5-flash-native-audio-preview-12-2025',
       systemInstruction: config.systemInstruction,
       voiceName: config.voiceName || 'Aoede', // Female voice
       tools: config.tools,
@@ -139,11 +140,18 @@ export class GeminiLiveClient {
    * Send initial setup message with configuration
    */
   private sendSetup(): void {
-    // Setup for native audio model
+    // Setup for Live API model with audio and tools
     const setup: Record<string, unknown> = {
       model: `models/${this.config.model}`,
       generationConfig: {
         responseModalities: ['AUDIO'],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: this.config.voiceName || 'Aoede',
+            },
+          },
+        },
       },
     };
 
@@ -155,8 +163,14 @@ export class GeminiLiveClient {
       };
     }
 
+    // Add tools if configured
+    if (this.config.tools && this.config.tools.length > 0) {
+      setup.tools = this.config.tools;
+    }
+
     const setupMessage = { setup };
-    console.log('[GeminiLive] Sending setup:', JSON.stringify(setupMessage, null, 2).substring(0, 500));
+    console.log('[GeminiLive] Sending setup:', JSON.stringify(setupMessage, null, 2).substring(0, 3000));
+    console.log('[GeminiLive] Tools included:', setup.tools ? 'YES' : 'NO');
     this.send(setupMessage);
   }
 
@@ -224,14 +238,30 @@ export class GeminiLiveClient {
         this.emit('error', new Error(message.error.message || 'API Error'));
       }
 
-      // Tool call
+      // Tool call - comes as separate toolCall message
       if (message.toolCall) {
+        console.log('[GeminiLive] Tool call received:', JSON.stringify(message.toolCall));
         const calls = message.toolCall.functionCalls || [];
         for (const call of calls) {
           this.emit('tool_call', {
+            id: call.id, // Include the ID for response matching
             name: call.name,
-            args: call.args,
+            args: call.args || {},
           });
+        }
+      }
+
+      // Tool call might also be in serverContent.modelTurn.parts
+      if (message.serverContent?.modelTurn?.parts) {
+        for (const part of message.serverContent.modelTurn.parts) {
+          if (part.functionCall) {
+            console.log('[GeminiLive] Function call in part:', JSON.stringify(part.functionCall));
+            this.emit('tool_call', {
+              id: part.functionCall.id || `call-${Date.now()}`,
+              name: part.functionCall.name,
+              args: part.functionCall.args || {},
+            });
+          }
         }
       }
     } catch (error) {
@@ -278,18 +308,27 @@ export class GeminiLiveClient {
 
   /**
    * Send tool response
+   * @param id - The function call ID to match with the request
+   * @param name - The function name
+   * @param response - The response object
    */
-  sendToolResponse(name: string, response: object): void {
-    if (!this.isConnected || !this.ws) return;
+  sendToolResponse(id: string, name: string, response: object): void {
+    if (!this.isConnected || !this.ws) {
+      console.log('[GeminiLive] Cannot send tool response - not connected');
+      return;
+    }
 
-    this.send({
+    const toolResponseMsg = {
       toolResponse: {
         functionResponses: [{
+          id,
           name,
           response,
         }],
       },
-    });
+    };
+    console.log('[GeminiLive] Sending tool response:', JSON.stringify(toolResponseMsg));
+    this.send(toolResponseMsg);
   }
 
   /**
