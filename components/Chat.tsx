@@ -366,53 +366,97 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col h-full bg-white overflow-x-hidden">
+      {/* Drawer Menu */}
+      <AnimatePresence>
+        {showMenu && (
+          <>
+            {/* Overlay */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowMenu(false)}
+              className="fixed inset-0 bg-black/30 z-40"
+            />
+            {/* Drawer */}
+            <motion.div
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="fixed left-0 top-0 h-full w-72 bg-white shadow-2xl z-50 flex flex-col"
+            >
+              {/* Drawer Header */}
+              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-google-blue via-google-red to-google-yellow flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-white" />
+                  </div>
+                  <span className="font-semibold text-gray-900">Menu</span>
+                </div>
+                <button
+                  onClick={() => setShowMenu(false)}
+                  className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+
+              {/* Menu Items */}
+              <div className="flex-1 py-2">
+                <button
+                  onClick={() => setShowMenu(false)}
+                  className="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 transition-colors text-left"
+                >
+                  <CalendarDays className="w-6 h-6 text-google-blue" />
+                  <span className="text-base text-gray-700">My Reservations</span>
+                </button>
+                <button
+                  onClick={() => setShowMenu(false)}
+                  className="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 transition-colors text-left"
+                >
+                  <History className="w-6 h-6 text-google-green" />
+                  <span className="text-base text-gray-700">History</span>
+                </button>
+                <button
+                  onClick={() => setShowMenu(false)}
+                  className="w-full px-4 py-3 flex items-center gap-4 hover:bg-gray-50 transition-colors text-left"
+                >
+                  <Search className="w-6 h-6 text-google-yellow" />
+                  <span className="text-base text-gray-700">Search</span>
+                </button>
+              </div>
+
+              {/* Drawer Footer */}
+              <div className="p-4 border-t border-gray-100">
+                <div className="flex items-center gap-3">
+                  <img
+                    src="https://i.pravatar.cc/150?img=68"
+                    alt="Tony Stark"
+                    className="w-10 h-10 rounded-full"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Tony Stark</p>
+                    <p className="text-xs text-gray-500">tony@stark.com</p>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="flex-shrink-0 px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 bg-white">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-3">
             {/* Hamburger Menu */}
-            <div className="relative">
-              <button
-                onClick={() => setShowMenu(!showMenu)}
-                className="w-9 h-9 md:w-10 md:h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
-              >
-                <Menu className="w-5 h-5 md:w-6 md:h-6 text-gray-600" />
-              </button>
-
-              {/* Dropdown Menu */}
-              <AnimatePresence>
-                {showMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50"
-                  >
-                    <button
-                      onClick={() => setShowMenu(false)}
-                      className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left"
-                    >
-                      <CalendarDays className="w-5 h-5 text-google-blue" />
-                      <span className="text-sm text-gray-700">My Reservations</span>
-                    </button>
-                    <button
-                      onClick={() => setShowMenu(false)}
-                      className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left"
-                    >
-                      <History className="w-5 h-5 text-google-green" />
-                      <span className="text-sm text-gray-700">History</span>
-                    </button>
-                    <button
-                      onClick={() => setShowMenu(false)}
-                      className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left"
-                    >
-                      <Search className="w-5 h-5 text-google-yellow" />
-                      <span className="text-sm text-gray-700">Search</span>
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <button
+              onClick={() => setShowMenu(true)}
+              className="w-9 h-9 md:w-10 md:h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+            >
+              <Menu className="w-5 h-5 md:w-6 md:h-6 text-gray-600" />
+            </button>
             <div>
               <h1 className="font-semibold text-gray-900 text-sm md:text-base">Gemini Agent</h1>
               <div className="flex items-center gap-1.5">
