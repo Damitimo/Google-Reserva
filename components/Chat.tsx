@@ -408,10 +408,10 @@ export default function Chat() {
                 <Sparkles className="w-8 h-8 text-white" />
               </div>
               <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                Where would you like to eat?
+                Hi Tony, what can I help you with?
               </h2>
               <p className="text-gray-500 mb-6">
-                Tell me what you're in the mood for and I'll find the perfect spot.
+                I can find restaurants, make reservations, and manage your bookings.
               </p>
 
               <div className="space-y-2">
