@@ -5,7 +5,7 @@ import { useAppStore } from '@/lib/store';
 import { Message, Restaurant, Reservation, QuickReply } from '@/types';
 import RestaurantCard from './RestaurantCard';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Mic, MicOff, Sparkles, Calendar, Users, MapPin, Edit3, X, CheckCircle2, XCircle, CreditCard, Clock, ChevronDown, Shield, AlertTriangle, Leaf, Podcast } from 'lucide-react';
+import { Send, Mic, MicOff, Sparkles, Calendar, Users, MapPin, Edit3, X, CheckCircle2, XCircle, CreditCard, Clock, ChevronDown, Shield, AlertTriangle, Leaf, Podcast, Menu } from 'lucide-react';
 import VoiceMode from './VoiceMode';
 import ReactMarkdown from 'react-markdown';
 
@@ -369,9 +369,10 @@ export default function Chat() {
       <div className="flex-shrink-0 px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 bg-white">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-3">
-            <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gradient-to-br from-google-blue via-google-red to-google-yellow flex items-center justify-center">
-              <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-white" />
-            </div>
+            {/* Hamburger Menu */}
+            <button className="w-9 h-9 md:w-10 md:h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
+              <Menu className="w-5 h-5 md:w-6 md:h-6 text-gray-600" />
+            </button>
             <div>
               <h1 className="font-semibold text-gray-900 text-sm md:text-base">Gemini Agent</h1>
               <div className="flex items-center gap-1.5">
