@@ -365,7 +365,7 @@ export default function Chat() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-white overflow-x-hidden">
+    <div className="flex flex-col h-full bg-white overflow-x-hidden relative">
       {/* Drawer Menu */}
       <AnimatePresence>
         {showMenu && (
@@ -376,7 +376,7 @@ export default function Chat() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowMenu(false)}
-              className="fixed inset-0 bg-black/30 z-40"
+              className="absolute inset-0 bg-black/30 z-40"
             />
             {/* Drawer */}
             <motion.div
@@ -384,7 +384,7 @@ export default function Chat() {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="fixed left-0 top-0 h-full w-72 bg-white shadow-2xl z-50 flex flex-col"
+              className="absolute left-0 top-0 h-full w-72 bg-white shadow-2xl z-50 flex flex-col"
             >
               {/* Drawer Header */}
               <div className="p-4 border-b border-gray-100 flex items-center justify-between">
