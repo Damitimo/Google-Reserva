@@ -69,34 +69,46 @@ function RestaurantMarker({
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
-              className="absolute bottom-full mb-3 w-56 -ml-[70px]"
+              className="absolute bottom-full mb-5 w-56 ml-[5px]"
             >
-              <div className="bg-white rounded-xl shadow-xl p-3 border border-gray-100">
-                <h3 className="font-semibold text-gray-900 truncate">{restaurant.name}</h3>
-                <p className="text-sm text-gray-500">{restaurant.cuisine}</p>
-                <div className="flex items-center gap-2 mt-1.5">
-                  <div className="flex items-center">
-                    <Star className="w-4 h-4 text-google-yellow fill-google-yellow" />
-                    <span className="text-sm font-medium ml-0.5">{restaurant.rating}</span>
+              <div className="bg-white rounded-xl shadow-xl overflow-hidden border border-gray-100">
+                {/* Restaurant Photo */}
+                {restaurant.photos?.[0] && (
+                  <div className="w-full h-24 overflow-hidden">
+                    <img
+                      src={restaurant.photos[0]}
+                      alt={restaurant.name}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
-                  <span className="text-gray-300">•</span>
-                  <div className="flex">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                      <DollarSign
-                        key={i}
-                        className={`w-3 h-3 ${i < restaurant.priceLevel ? 'text-google-green' : 'text-gray-300'}`}
-                      />
-                    ))}
+                )}
+                <div className="p-3">
+                  <h3 className="font-semibold text-gray-900 truncate">{restaurant.name}</h3>
+                  <p className="text-sm text-gray-500">{restaurant.cuisine}</p>
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <div className="flex items-center">
+                      <Star className="w-4 h-4 text-google-yellow fill-google-yellow" />
+                      <span className="text-sm font-medium ml-0.5">{restaurant.rating}</span>
+                    </div>
+                    <span className="text-gray-300">•</span>
+                    <div className="flex">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <DollarSign
+                          key={i}
+                          className={`w-3 h-3 ${i < restaurant.priceLevel ? 'text-google-green' : 'text-gray-300'}`}
+                        />
+                      ))}
+                    </div>
+                    {restaurant.walkingTime && (
+                      <>
+                        <span className="text-gray-300">•</span>
+                        <div className="flex items-center text-gray-500">
+                          <Clock className="w-3 h-3 mr-0.5" />
+                          <span className="text-xs">{restaurant.walkingTime}m</span>
+                        </div>
+                      </>
+                    )}
                   </div>
-                  {restaurant.walkingTime && (
-                    <>
-                      <span className="text-gray-300">•</span>
-                      <div className="flex items-center text-gray-500">
-                        <Clock className="w-3 h-3 mr-0.5" />
-                        <span className="text-xs">{restaurant.walkingTime}m</span>
-                      </div>
-                    </>
-                  )}
                 </div>
               </div>
               {/* Arrow */}
