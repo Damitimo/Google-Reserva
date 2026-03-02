@@ -10,9 +10,10 @@ interface RestaurantCardProps {
   restaurant: Restaurant;
   index: number;
   compact?: boolean;
+  disableReserve?: boolean;
 }
 
-export default function RestaurantCard({ restaurant, index, compact = false }: RestaurantCardProps) {
+export default function RestaurantCard({ restaurant, index, compact = false, disableReserve = false }: RestaurantCardProps) {
   const { selectRestaurant, triggerBookingChat, openReviewsModal, openMapModal, mapState } = useAppStore();
 
   // Check if mobile (under md breakpoint)
@@ -235,8 +236,13 @@ export default function RestaurantCard({ restaurant, index, compact = false }: R
               {restaurant.availableTimes.slice(0, 4).map((time, i) => (
                 <button
                   key={i}
-                  onClick={() => triggerBookingChat(restaurant.name, time)}
-                  className="px-2 py-0.5 bg-google-blue/10 text-google-blue text-xs font-medium rounded-md hover:bg-google-blue/20 transition-colors"
+                  onClick={() => !disableReserve && triggerBookingChat(restaurant.name, time)}
+                  disabled={disableReserve}
+                  className={`px-2 py-0.5 text-xs font-medium rounded-md transition-colors ${
+                    disableReserve
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-google-blue/10 text-google-blue hover:bg-google-blue/20'
+                  }`}
                 >
                   {time}
                 </button>
@@ -265,9 +271,16 @@ export default function RestaurantCard({ restaurant, index, compact = false }: R
           onClick={(e) => {
             e.stopPropagation();
             e.preventDefault();
-            triggerBookingChat(restaurant.name);
+            if (!disableReserve) {
+              triggerBookingChat(restaurant.name);
+            }
           }}
-          className="flex-1 py-2 text-sm text-google-blue font-medium hover:bg-blue-50 transition-colors"
+          disabled={disableReserve}
+          className={`flex-1 py-2 text-sm font-medium transition-colors ${
+            disableReserve
+              ? 'text-gray-400 cursor-not-allowed'
+              : 'text-google-blue hover:bg-blue-50'
+          }`}
         >
           Reserve
         </button>

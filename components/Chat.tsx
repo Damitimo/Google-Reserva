@@ -910,8 +910,9 @@ function MessageBubble({ message, isLoading, onQuickReply, isLastMessage, remind
   const isUser = message.role === 'user';
   const showLoading = isLoading && isLastMessage && !message.content;
   const buttonsActive = isLastMessage && !isLoading;
-  // Get global booking flow state to hide restaurant cards during booking
+  // Get global booking flow state and context
   const isInBookingFlow = useAppStore((state) => state.isInBookingFlow);
+  const bookingContext = useAppStore((state) => state.bookingContext);
 
   return (
     <motion.div
@@ -1063,9 +1064,8 @@ function MessageBubble({ message, isLoading, onQuickReply, isLastMessage, remind
               </div>
             )}
 
-            {/* Restaurant cards - horizontal scroll (don't show during booking flow) */}
-            {/* Additional guard: also hide if global isInBookingFlow is true */}
-            {message.restaurants && message.restaurants.length > 0 && !message.quickReplies && !message.bookingSummary && !isInBookingFlow && (
+            {/* Restaurant cards - horizontal scroll */}
+            {message.restaurants && message.restaurants.length > 0 && !message.quickReplies && !message.bookingSummary && (
               <div className="mt-2 -mr-4 md:-mr-6 h-[360px] md:h-[420px]">
                 <div className="flex gap-3 overflow-x-auto overflow-y-hidden h-full pb-2 pr-4 md:pr-6 scrollbar-hide snap-x snap-mandatory">
                   {message.restaurants.map((restaurant, index) => (
@@ -1073,6 +1073,10 @@ function MessageBubble({ message, isLoading, onQuickReply, isLastMessage, remind
                       <RestaurantCard
                         restaurant={restaurant}
                         index={index}
+                        disableReserve={isInBookingFlow && (
+                          bookingContext.restaurant?.id === restaurant.id ||
+                          bookingContext.restaurant?.name === restaurant.name
+                        )}
                       />
                     </div>
                   ))}

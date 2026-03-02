@@ -211,7 +211,7 @@ const tools: Tool[] = [
               description: 'The time (if already mentioned, e.g., "7pm", "around 8")',
             },
           },
-          required: ['restaurant_id', 'restaurant_name'],
+          required: ['restaurant_name'],
         },
       },
     ],
@@ -416,15 +416,24 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
     }
 
     case 'check_availability': {
-      const id = args.restaurant_id as string;
+      const id = args.restaurant_id as string | undefined;
       const restaurantName = args.restaurant_name as string | undefined;
 
-      // Check cached Places API results first
-      let restaurant = cachedRestaurants.get(id);
-      if (!restaurant) {
+      // Check cached Places API results first by ID
+      let restaurant: Restaurant | undefined = id ? cachedRestaurants.get(id) : undefined;
+      if (!restaurant && id) {
         restaurant = MOCK_RESTAURANTS.find((r) => r.id === id);
       }
-      // Try finding by name if ID didn't work
+      // Try finding by name in cache (important for Places API results)
+      if (!restaurant && restaurantName) {
+        for (const [, cached] of cachedRestaurants) {
+          if (cached.name.toLowerCase().includes(restaurantName.toLowerCase())) {
+            restaurant = cached;
+            break;
+          }
+        }
+      }
+      // Try finding by name in mock data
       if (!restaurant && restaurantName) {
         restaurant = MOCK_RESTAURANTS.find((r) =>
           r.name.toLowerCase().includes(restaurantName.toLowerCase())
@@ -444,15 +453,24 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
     }
 
     case 'make_reservation': {
-      const id = args.restaurant_id as string;
+      const id = args.restaurant_id as string | undefined;
       const restaurantName = args.restaurant_name as string | undefined;
 
-      // Check cached Places API results first
-      let restaurant = cachedRestaurants.get(id);
-      if (!restaurant) {
+      // Check cached Places API results first by ID
+      let restaurant: Restaurant | undefined = id ? cachedRestaurants.get(id) : undefined;
+      if (!restaurant && id) {
         restaurant = MOCK_RESTAURANTS.find((r) => r.id === id);
       }
-      // Try finding by name if ID didn't work
+      // Try finding by name in cache (important for Places API results)
+      if (!restaurant && restaurantName) {
+        for (const [, cached] of cachedRestaurants) {
+          if (cached.name.toLowerCase().includes(restaurantName.toLowerCase())) {
+            restaurant = cached;
+            break;
+          }
+        }
+      }
+      // Try finding by name in mock data
       if (!restaurant && restaurantName) {
         restaurant = MOCK_RESTAURANTS.find((r) =>
           r.name.toLowerCase().includes(restaurantName.toLowerCase())
@@ -513,7 +531,7 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
     }
 
     case 'collect_booking_info': {
-      const restaurantId = args.restaurant_id as string;
+      const restaurantId = args.restaurant_id as string | undefined;
       const restaurantName = args.restaurant_name as string;
       const partySize = args.party_size as number | undefined;
       const dietaryRestrictions = args.dietary_restrictions as string | undefined;
@@ -521,30 +539,47 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       const time = args.time as string | undefined;
 
       // Get restaurant from cache or mock
-      let restaurant = cachedRestaurants.get(restaurantId);
-      if (!restaurant) {
-        restaurant = MOCK_RESTAURANTS.find((r) => r.id === restaurantId);
+      let restaurant: Restaurant | undefined = undefined;
+
+      // First try by ID if provided
+      if (restaurantId) {
+        restaurant = cachedRestaurants.get(restaurantId);
+        if (!restaurant) {
+          restaurant = MOCK_RESTAURANTS.find((r) => r.id === restaurantId);
+        }
       }
-      // Try finding by name if ID didn't work
+
+      // Try finding by name in cache first (important for Places API results)
+      if (!restaurant && restaurantName) {
+        for (const [, cached] of cachedRestaurants) {
+          if (cached.name.toLowerCase().includes(restaurantName.toLowerCase())) {
+            restaurant = cached;
+            break;
+          }
+        }
+      }
+
+      // Try finding by name in mock data
       if (!restaurant && restaurantName) {
         restaurant = MOCK_RESTAURANTS.find((r) =>
           r.name.toLowerCase().includes(restaurantName.toLowerCase())
         );
-        // If still not found and using Places API, search for it
-        if (!restaurant && USE_PLACES_API) {
-          try {
-            const searchResults = await searchPlacesAPI({
-              query: `${restaurantName} restaurant Los Angeles`,
-              location: { lat: 34.0522, lng: -118.2437 },
-              radius: 10000,
-            });
-            if (searchResults.length > 0) {
-              restaurant = searchResults[0];
-              cachedRestaurants.set(restaurant.id, restaurant);
-            }
-          } catch (e) {
-            console.error('Error searching for restaurant:', e);
+      }
+
+      // If still not found and using Places API, search for it
+      if (!restaurant && restaurantName && USE_PLACES_API) {
+        try {
+          const searchResults = await searchPlacesAPI({
+            query: `${restaurantName} restaurant Los Angeles`,
+            location: { lat: 34.0522, lng: -118.2437 },
+            radius: 10000,
+          });
+          if (searchResults.length > 0) {
+            restaurant = searchResults[0];
+            cachedRestaurants.set(restaurant.id, restaurant);
           }
+        } catch (e) {
+          console.error('Error searching for restaurant:', e);
         }
       }
 
@@ -772,9 +807,12 @@ export async function POST(request: NextRequest) {
     const chat = model.startChat({ history });
 
     const lastMessage = messages[messages.length - 1];
+    console.log('[Gemini] Sending message:', lastMessage.content);
+
     const result = await chat.sendMessage(lastMessage.content);
 
     let response = result.response;
+    console.log('[Gemini] Raw response candidates:', JSON.stringify(response.candidates, null, 2));
     const toolCalls: Array<{ name: string; args: Record<string, unknown>; result: unknown }> = [];
     let restaurants: Restaurant[] = [];
     let mapUpdate = null;
@@ -859,6 +897,54 @@ export async function POST(request: NextRequest) {
       text = response.text();
     } catch {
       // No text response, that's ok
+    }
+
+    // FALLBACK: If Gemini returns empty content and no quick replies, something went wrong
+    // This can happen when clicking "Reserve" on a restaurant card and Gemini gets confused
+    if (!text && !quickReplies && toolCalls.length === 0) {
+      // Check if the user is trying to book something
+      const lastUserMessage = messages[messages.length - 1]?.content || '';
+      const bookingMatch = lastUserMessage.match(/(?:book|reserve)\s+(.+?)(?:\s+for|$)/i);
+
+      if (bookingMatch) {
+        const restaurantName = bookingMatch[1].trim();
+        // Try to find the restaurant and start the booking flow manually
+        let restaurant = MOCK_RESTAURANTS.find((r) =>
+          r.name.toLowerCase().includes(restaurantName.toLowerCase())
+        );
+
+        // Check cache too
+        if (!restaurant) {
+          for (const [, cached] of cachedRestaurants) {
+            if (cached.name.toLowerCase().includes(restaurantName.toLowerCase())) {
+              restaurant = cached;
+              break;
+            }
+          }
+        }
+
+        if (restaurant) {
+          // Generate booking response manually
+          text = `Great choice! I'd be happy to help you book at **${restaurant.name}**. How many people will be joining?`;
+          quickReplies = [
+            { label: '2 people', value: '2 people' },
+            { label: '4 people', value: '4 people' },
+            { label: '6 people', value: '6 people' },
+          ];
+        } else {
+          text = `I'd be happy to help you book at ${restaurantName}. Let me find that restaurant for you first. How many people will be dining?`;
+          quickReplies = [
+            { label: '2 people', value: '2 people' },
+            { label: '4 people', value: '4 people' },
+            { label: '6 people', value: '6 people' },
+          ];
+        }
+      } else {
+        // Generic fallback
+        text = "I'm ready to help! What would you like to do?";
+      }
+
+      console.warn('[API Fallback] Gemini returned empty response, using fallback for:', lastUserMessage);
     }
 
     return NextResponse.json({
