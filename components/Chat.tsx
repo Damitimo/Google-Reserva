@@ -376,7 +376,7 @@ export default function Chat() {
               <h1 className="font-semibold text-gray-900 text-sm md:text-base">Gemini Agent</h1>
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-google-green rounded-full animate-pulse" />
-                <p className="text-xs md:text-sm text-gray-500">Agent active</p>
+                <p className="text-xs md:text-sm text-gray-500">Active</p>
               </div>
             </div>
           </div>
