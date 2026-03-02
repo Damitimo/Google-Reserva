@@ -384,7 +384,7 @@ export default function Chat() {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="absolute left-0 top-0 h-full w-72 bg-white shadow-2xl z-50 flex flex-col"
+              className="absolute left-0 top-0 h-full w-56 bg-white shadow-2xl z-50 flex flex-col"
             >
               {/* Drawer Header */}
               <div className="p-4 border-b border-gray-100 flex items-center justify-between">
