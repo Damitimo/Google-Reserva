@@ -92,17 +92,19 @@ Reservation flow - WAIT FOR USER CONFIRMATION AT EACH STEP:
 3. WAIT for user to answer
 4. Ask about CUISINE if not mentioned: "Any type of food in mind - Italian, Japanese, something else?"
 5. WAIT for user to answer
-6. Ask about TIME if not mentioned: "What time works for you?"
-7. WAIT for user to answer
-8. Suggest a restaurant: "How about [Restaurant]? Great for a romantic evening with [feature]. Does that sound good?"
-9. WAIT for user to confirm the restaurant
-10. ONLY THEN check_calendar silently for the time
-11. If calendar is clear: "You're free at [time]. So that's [Restaurant] at [time] for 2. Should I book it?"
-12. WAIT for explicit "yes" / "book it" / "go ahead"
-13. BEFORE payment: "This restaurant requires a $25 deposit. Should I charge your Google Pay?"
-14. WAIT for explicit "yes"
-15. ONLY THEN call process_payment, then make_reservation
-16. After booking: "All set! Want me to set a reminder in case you need to cancel?"
+6. Ask about DIETARY RESTRICTIONS: "Any allergies or dietary restrictions I should know about?"
+7. WAIT for user to answer (if none, proceed; if yes, factor into recommendation)
+8. Ask about TIME if not mentioned: "What time works for you?"
+9. WAIT for user to answer
+10. Suggest a restaurant that accommodates their dietary needs: "How about [Restaurant]? Great for a romantic evening with [feature]. Does that sound good?"
+11. WAIT for user to confirm the restaurant
+12. ONLY THEN check_calendar silently for the time
+13. If calendar is clear: "You're free at [time]. So that's [Restaurant] at [time] for 2. Should I book it?"
+14. WAIT for explicit "yes" / "book it" / "go ahead"
+15. BEFORE payment: "This restaurant requires a $25 deposit. Should I charge your Google Pay?"
+16. WAIT for explicit "yes"
+17. ONLY THEN call process_payment, then make_reservation (include dietary restrictions in special requests)
+18. After booking: "All set! Want me to set a reminder in case you need to cancel?"
 
 IMPORTANT: Each step should be a SEPARATE turn. Don't combine multiple questions. Ask ONE thing at a time and wait for the response.
 
@@ -306,6 +308,7 @@ Remember this is a voice conversation. Be natural and conversational.`;
                 const reservationDate = (args.date as string) || 'Today';
                 const reservationTime = (args.time as string) || '7:00 PM';
                 const partySize = (args.party_size as number) || 2;
+                const specialRequests = (args.special_requests as string) || undefined;
 
                 console.log('[VoiceMode] make_reservation args:', args);
 
@@ -316,6 +319,7 @@ Remember this is a voice conversation. Be natural and conversational.`;
                   date: reservationDate,
                   time: reservationTime,
                   partySize,
+                  specialRequests,
                   message: `Reservation confirmed! Confirmation number: ${confirmationCode}`,
                 };
 
@@ -340,6 +344,7 @@ Remember this is a voice conversation. Be natural and conversational.`;
                   partySize,
                   status: 'confirmed' as const,
                   confirmationCode,
+                  specialRequests,
                 };
 
                 // Add reservation confirmation to chat (with card, no text)
