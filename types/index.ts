@@ -81,6 +81,11 @@ export interface MerchantAgentMessage {
   type: 'cancellation' | 'modification' | 'alert';
 }
 
+export interface ReminderConfirmation {
+  text: string;
+  time: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -92,6 +97,7 @@ export interface Message {
   quickReplies?: QuickReply[];
   bookingSummary?: BookingSummary;
   merchantAgent?: MerchantAgentMessage;
+  reminderConfirmation?: ReminderConfirmation;
 }
 
 export interface ToolCall {

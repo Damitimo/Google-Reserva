@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Donna | AI-Powered Dining Reservations",
+  title: "Gemini Agent | AI-Powered Dining Reservations",
   description: "Discover and book the perfect restaurant with intelligent recommendations powered by Google",
 };
 

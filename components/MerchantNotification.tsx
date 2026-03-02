@@ -29,7 +29,7 @@ export default function MerchantNotification() {
           {/* Compact header with alert tag */}
           <div className="px-3 py-2 border-b border-gray-100 flex items-center gap-2">
             <GeminiIcon className="w-4 h-4" />
-            <span className="text-xs font-medium text-gray-700">Donna</span>
+            <span className="text-xs font-medium text-gray-700">Gemini Agent</span>
             <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 text-[10px] font-medium rounded">Action needed</span>
             <button
               onClick={(e) => {
@@ -87,7 +87,7 @@ export default function MerchantNotification() {
               <GeminiIcon className="w-5 h-5" />
             </div>
             <div className="flex-1">
-              <div className="text-white font-medium text-sm">Gemini • Donna</div>
+              <div className="text-white font-medium text-sm">Gemini Agent</div>
             </div>
             <button
               onClick={(e) => {

@@ -665,7 +665,7 @@ function isBookingFlowActive(messages: Array<{ role: string; content: string }>)
     /unfortunately.*cancel/i,
     /had to cancel/i,
     /need to cancel/i,
-    /I just (heard|received word) from/i,  // Donna's cancellation message
+    /I just (heard|received word) from/i,  // Agent's cancellation message
     /find.*alternative/i,
     /Find me.*restaurants.*with availability/i,  // User searching after cancellation
   ];

@@ -46,11 +46,11 @@ export default function ChromeFrame({ children }: ChromeFrameProps) {
         <div className="flex items-center flex-1 ml-16">
           {/* Active tab */}
           <div className="flex items-center gap-2 bg-[#202124] px-4 py-1.5 rounded-t-lg min-w-[200px] max-w-[240px]">
-            {/* Donna favicon */}
+            {/* Gemini Agent favicon */}
             <div className="w-4 h-4 rounded-full bg-gradient-to-br from-google-blue to-google-green flex items-center justify-center flex-shrink-0">
-              <span className="text-[8px] font-bold text-white">D</span>
+              <span className="text-[8px] font-bold text-white">G</span>
             </div>
-            <span className="text-sm text-gray-200 truncate flex-1">Donna - AI Assistant</span>
+            <span className="text-sm text-gray-200 truncate flex-1">Gemini Agent</span>
             <X className="w-3.5 h-3.5 text-gray-500 hover:text-gray-300 cursor-pointer flex-shrink-0" />
           </div>
 
@@ -84,7 +84,7 @@ export default function ChromeFrame({ children }: ChromeFrameProps) {
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
-            <span className="text-sm text-gray-300">donna.google.com</span>
+            <span className="text-sm text-gray-300">gemini.google.com/agent</span>
           </div>
           <Star className="w-4 h-4 text-gray-500 cursor-pointer hover:text-gray-300" />
         </div>

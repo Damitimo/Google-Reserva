@@ -48,33 +48,56 @@ export default function VoiceMode({ isOpen, onClose }: VoiceModeProps) {
     connectionIdRef.current = myConnectionId;
     console.log('[VoiceMode] Starting connection:', myConnectionId);
 
-    const systemPrompt = `You are Donna, a warm and helpful dining concierge powered by Google. You help users find restaurants and make reservations in Los Angeles.
+    const systemPrompt = `You are a Gemini Agent, a warm and helpful dining concierge powered by Google. You help users find restaurants and make reservations in Los Angeles.
 
 CRITICAL RULES:
 1. Only speak your direct responses to the user. NEVER speak your internal thoughts or reasoning out loud.
 2. ALWAYS use check_calendar before confirming any reservation time to ensure the user is free.
 3. If there's a calendar conflict, tell the user about it naturally (e.g., "Oh, I see you have dinner with Sarah at 7pm. How about 5:30pm or 9pm instead?")
+4. NEVER make a reservation without EXPLICIT user confirmation.
+5. NEVER charge the card without EXPLICIT payment confirmation. Say "This restaurant requires a $25 deposit to hold the table. Should I charge your card on file?" and WAIT for "yes".
 
 Your capabilities:
-- check_calendar: Check if user is free at a specific time. ALWAYS use this before booking.
-- make_reservation: Complete a restaurant reservation
-- process_payment: Charge the user's card for reservation deposits ($25 typical)
-- set_reminder: Set reminders (e.g., "Would you like me to remind you to cancel if your plans change?")
+- check_calendar: Check if the user is free at a specific date and time. ALWAYS use before booking.
+- make_reservation: Complete a restaurant reservation - ONLY after explicit user confirmation
+- process_payment: Charge the user's card - ONLY after explaining the deposit and getting explicit "yes"
+- set_reminder: Set reminders (e.g., cancellation reminders)
 
 Your personality:
 - Warm, knowledgeable, and efficient
 - Speak naturally like a trusted friend who knows all the best spots
 - Keep responses concise (2-3 sentences max)
-- Be proactive about checking calendar and offering reminders
+- Be PROACTIVE with helpful insights
+
+CONTEXT INFERENCE - Be smart about understanding context:
+- "dinner with girlfriend/boyfriend/wife/husband" = 2 people, romantic occasion (DON'T ask how many)
+- "business dinner with clients" = likely 4-6 people, professional setting
+- "birthday dinner" = celebration, ask party size
+- "date night" = 2 people, romantic
+- "family dinner" = ask party size
+
+PERSONALIZATION - Only ask what you don't know:
+- If occasion is clear from context (e.g., "girlfriend"), don't ask "what's the occasion?"
+- If party size is implied (e.g., "girlfriend" = 2), don't ask "how many people?"
+- Use context to tailor recommendations (romantic = intimate lighting, business = quiet for conversation)
+
+PROACTIVE TIPS - Offer helpful insights:
+- Traffic: "Heads up, traffic on the 405 is heavy around that time. You might want to leave 20 minutes early."
+- Budget: "Just so you know, you've spent about $400 on dining this month. This would be around $150 for two."
+- Weather: "It's supposed to be nice tonight - maybe request patio seating?"
 
 Reservation flow:
-1. Gather preferences (location, cuisine, party size, time, dietary needs)
-2. Suggest a restaurant
-3. ALWAYS check_calendar for the proposed time
-4. If conflict, suggest alternatives from the calendar response
-5. Once time is confirmed, process_payment for deposit
-6. make_reservation to confirm
-7. Offer to set_reminder for cancellation
+1. INFER what you can from context (girlfriend=2 people+romantic, business=professional)
+2. Only ask what's NOT clear from context
+3. Suggest a restaurant with personalized reasoning based on occasion
+4. ALWAYS check_calendar for the proposed time
+5. If conflict, suggest alternatives from the calendar response
+6. Summarize: "Perfect! So that's [Restaurant] at [time] for 2. Should I book this?"
+7. WAIT for explicit "yes" / "book it" / "go ahead"
+8. BEFORE payment, say: "This restaurant requires a $25 deposit. Should I charge your Google Pay?"
+9. WAIT for explicit payment confirmation
+10. ONLY THEN call process_payment, then make_reservation
+11. After booking, offer: "Want me to set a reminder to cancel if your plans change?"
 
 Remember this is a voice conversation. Be natural and conversational.`;
 
@@ -224,7 +247,8 @@ Remember this is a voice conversation. Be natural and conversational.`;
 
         client.on('turn_complete', () => {
           // Turn complete - audio response finished
-          console.log('[VoiceMode] Turn complete');
+          console.log('[VoiceMode] Turn complete - setting state to listening');
+          setVoiceState('listening');
         });
 
         client.on('interrupted', () => {
@@ -270,37 +294,56 @@ Remember this is a voice conversation. Be natural and conversational.`;
 
               case 'make_reservation': {
                 // Simulate making a reservation
-                const confirmationNumber = `RES${Date.now().toString().slice(-6)}`;
+                const confirmationCode = `RES${Date.now().toString().slice(-6)}`;
+                const restaurantName = (args.restaurant_name as string) || 'Restaurant';
+                const reservationDate = (args.date as string) || 'Today';
+                const reservationTime = (args.time as string) || '7:00 PM';
+                const partySize = (args.party_size as number) || 2;
+
+                console.log('[VoiceMode] make_reservation args:', args);
+
                 response = {
                   success: true,
-                  confirmationNumber,
-                  restaurant: args.restaurant_name,
-                  date: args.date,
-                  time: args.time,
-                  partySize: args.party_size,
-                  message: `Reservation confirmed! Confirmation number: ${confirmationNumber}`,
+                  confirmationCode,
+                  restaurant: restaurantName,
+                  date: reservationDate,
+                  time: reservationTime,
+                  partySize,
+                  message: `Reservation confirmed! Confirmation number: ${confirmationCode}`,
                 };
 
-                // Add booking confirmation to chat
+                // Create proper reservation object for the card
+                const reservation = {
+                  id: confirmationCode,
+                  restaurant: {
+                    id: `voice-${Date.now()}`,
+                    name: restaurantName,
+                    cuisine: 'Fine Dining',
+                    priceLevel: 3 as const,
+                    rating: 4.5,
+                    reviewCount: 150,
+                    address: 'Los Angeles, CA',
+                    location: { lat: 34.0522, lng: -118.2437 },
+                    photos: [],
+                    openNow: true,
+                    highlights: [],
+                  },
+                  date: reservationDate,
+                  time: reservationTime,
+                  partySize,
+                  status: 'confirmed' as const,
+                  confirmationCode,
+                };
+
+                // Add reservation confirmation to chat (with card, no text)
                 const bookingMessage = {
                   id: `booking-${Date.now()}`,
                   role: 'assistant' as const,
-                  content: `Your reservation has been confirmed!`,
+                  content: '', // No text - let the card speak for itself
                   timestamp: new Date(),
-                  booking: {
-                    restaurant: {
-                      name: args.restaurant_name as string,
-                      cuisine: 'Fine Dining',
-                      priceLevel: 3,
-                      rating: 4.5,
-                      address: 'Los Angeles, CA',
-                    },
-                    date: args.date as string,
-                    time: args.time as string,
-                    partySize: args.party_size as number,
-                    confirmationNumber,
-                  },
+                  reservation,
                 };
+                console.log('[VoiceMode] Adding reservation card:', JSON.stringify(bookingMessage, null, 2));
                 addMessage(bookingMessage);
 
                 // Update booking context in store
@@ -317,23 +360,47 @@ Remember this is a voice conversation. Be natural and conversational.`;
 
               case 'process_payment': {
                 // Simulate payment processing
-                const amount = args.amount as number;
+                const amount = (args.amount as number) || 25; // Default $25 deposit
                 response = {
                   success: true,
                   amount,
                   last4: '4242',
-                  message: `Successfully charged $${amount.toFixed(2)} to card ending in 4242.`,
+                  cardType: 'Visa',
+                  message: `Payment successful. Charged $${amount.toFixed(2)} to Visa ending in 4242. The deposit is fully refundable if you cancel 24 hours before your reservation.`,
                 };
                 console.log('[VoiceMode] Payment processed:', response);
+
+                // Explicitly tell model to continue speaking after payment
+                setTimeout(() => {
+                  console.log('[VoiceMode] Tool response sent, model should continue...');
+                }, 100);
                 break;
               }
 
               case 'set_reminder': {
+                const reminderText = args.reminder_text as string || 'Cancellation reminder';
+                const reminderTime = args.remind_before_minutes as number || 60;
+
                 response = {
                   success: true,
-                  reminderText: args.reminder_text,
-                  message: `Reminder set: "${args.reminder_text}"`,
+                  reminderText,
+                  reminderTime,
+                  message: `Reminder set: "${reminderText}" - ${reminderTime} minutes before`,
                 };
+
+                // Add reminder confirmation to chat
+                const reminderMessage = {
+                  id: `reminder-${Date.now()}`,
+                  role: 'assistant' as const,
+                  content: '',
+                  timestamp: new Date(),
+                  reminderConfirmation: {
+                    text: reminderText,
+                    time: `${reminderTime} minutes before reservation`,
+                  },
+                };
+                addMessage(reminderMessage);
+
                 console.log('[VoiceMode] Reminder set:', response);
                 break;
               }
@@ -347,7 +414,10 @@ Remember this is a voice conversation. Be natural and conversational.`;
           }
 
           // Send tool response back to the model
+          console.log('[VoiceMode] Sending tool response:', { id, name, response });
+          setVoiceState('processing'); // Show processing while model generates response
           client.sendToolResponse(id, name, response);
+          console.log('[VoiceMode] Tool response sent, waiting for model to continue...');
         });
 
         client.on('error', (err) => {
@@ -455,7 +525,7 @@ Remember this is a voice conversation. Be natural and conversational.`;
         {/* Header */}
         <div className="absolute top-6 left-6 flex items-center gap-3">
           <GeminiIcon className="w-8 h-8" />
-          <span className="text-white font-medium">Donna</span>
+          <span className="text-white font-medium">Gemini Agent</span>
         </div>
 
         {/* Main visualization */}
@@ -539,7 +609,7 @@ Remember this is a voice conversation. Be natural and conversational.`;
             {voiceState === 'connecting' && 'Connecting...'}
             {voiceState === 'listening' && 'Listening...'}
             {voiceState === 'processing' && 'Processing...'}
-            {voiceState === 'speaking' && 'Donna is speaking...'}
+            {voiceState === 'speaking' && 'Speaking...'}
             {voiceState === 'idle' && 'Ready'}
           </p>
         </motion.div>
@@ -557,7 +627,7 @@ Remember this is a voice conversation. Be natural and conversational.`;
 
         {/* Bottom hint */}
         <div className="absolute bottom-8 text-white/40 text-sm">
-          Speak naturally • Donna will respond in real-time
+          Speak naturally • Gemini will respond in real-time
         </div>
       </motion.div>
     </AnimatePresence>

@@ -240,15 +240,16 @@ export default function Map() {
 
         {/* Map overlay - branding */}
         <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-lg px-4 py-2 shadow-lg">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center">
             <div className="flex">
-              <span className="text-google-blue font-bold">D</span>
+              <span className="text-google-blue font-bold">G</span>
               <span className="text-google-red font-bold">o</span>
-              <span className="text-google-yellow font-bold">n</span>
-              <span className="text-google-blue font-bold">n</span>
-              <span className="text-google-green font-bold">a</span>
+              <span className="text-google-yellow font-bold">o</span>
+              <span className="text-google-blue font-bold">g</span>
+              <span className="text-google-green font-bold">l</span>
+              <span className="text-google-red font-bold">e</span>
             </div>
-            <span className="text-xs text-gray-400">by Google Maps</span>
+            <span className="text-gray-600 font-normal ml-1">Maps</span>
           </div>
         </div>
 

@@ -136,14 +136,14 @@ export const useAppStore = create<AppStore>((set, get) => ({
     };
     addMessage(merchantMessage);
 
-    // Add Donna's response with rebooking options
+    // Add agent response with rebooking options
     setTimeout(() => {
       const restaurant = merchantNotification.reservation?.restaurant;
       const cuisine = restaurant?.cuisine || 'similar';
       const location = restaurant?.address?.split(',')[1]?.trim() || 'nearby';
 
-      const donnaResponse: Message = {
-        id: `donna-rebook-${Date.now()}`,
+      const agentResponse: Message = {
+        id: `agent-rebook-${Date.now()}`,
         role: 'assistant',
         content: `I just received word from ${merchantNotification.restaurantName} that they unfortunately need to cancel your reservation. I'm so sorry about this!\n\nDon't worry though - I can help you find an alternative. Would you like me to:\n\n• **Rebook at ${merchantNotification.restaurantName}** for a different time\n• **Find similar restaurants** nearby that have availability\n• **Check your other saved options** from earlier`,
         quickReplies: [
@@ -152,7 +152,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           { label: 'Show other options', value: 'Show me other restaurant options from my earlier search' },
         ],
       };
-      addMessage(donnaResponse);
+      addMessage(agentResponse);
     }, 1500);
 
     dismissMerchantNotification();

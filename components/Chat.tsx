@@ -46,7 +46,7 @@ export default function Chat() {
   const [calendarCheckAfterMessageId, setCalendarCheckAfterMessageId] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
-  const [ttsEnabled, setTtsEnabled] = useState(true); // Toggle for TTS
+  const [ttsEnabled, setTtsEnabled] = useState(false); // TTS disabled - voice mode handles audio
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -138,7 +138,7 @@ export default function Chat() {
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
-    // Try to use a female voice for Donna
+    // Try to use a female voice for Gemini Agent
     const voices = window.speechSynthesis.getVoices();
     const femaleVoice = voices.find(v =>
       v.name.includes('Samantha') ||
@@ -373,7 +373,7 @@ export default function Chat() {
               <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-white" />
             </div>
             <div>
-              <h1 className="font-semibold text-gray-900 text-sm md:text-base">Donna</h1>
+              <h1 className="font-semibold text-gray-900 text-sm md:text-base">Gemini Agent</h1>
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-google-green rounded-full animate-pulse" />
                 <p className="text-xs md:text-sm text-gray-500">Agent active</p>
@@ -994,6 +994,25 @@ function MessageBubble({ message, isLoading, onQuickReply, isLastMessage }: { me
             {/* Reservation confirmation card */}
             {message.reservation && (
               <ReservationCard reservation={message.reservation} />
+            )}
+
+            {/* Reminder confirmation card */}
+            {message.reminderConfirmation && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm"
+              >
+                <div className="w-8 h-8 rounded-full bg-google-blue/10 flex items-center justify-center">
+                  <Clock className="w-4 h-4 text-google-blue" />
+                </div>
+                <div className="flex-1">
+                  <span className="text-sm font-medium text-gray-800">Reminder Set</span>
+                  <p className="text-xs text-gray-500">{message.reminderConfirmation.text}</p>
+                  <p className="text-xs text-gray-400">{message.reminderConfirmation.time}</p>
+                </div>
+                <CheckCircle2 className="w-5 h-5 text-google-green flex-shrink-0" />
+              </motion.div>
             )}
 
             {/* Added to calendar confirmation - shows after confirmed reservation */}
