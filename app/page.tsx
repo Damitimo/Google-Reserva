@@ -24,7 +24,7 @@ function AppContent() {
       {/* Desktop/Tablet Layout - Map + Chat side by side */}
       <div className="hidden md:flex h-full p-4 gap-4">
         {/* Map - Left Side */}
-        <div className="flex-1 h-full rounded-2xl overflow-hidden shadow-lg">
+        <div className="flex-1 h-full rounded-2xl overflow-hidden shadow-lg border border-gray-300">
           <Map />
         </div>
 
