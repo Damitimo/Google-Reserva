@@ -306,7 +306,10 @@ export const useAppStore = create<AppStore>((set, get) => ({
   // Voice mode
   showVoiceMode: false,
   openVoiceMode: () => set({ showVoiceMode: true }),
-  closeVoiceMode: () => set({ showVoiceMode: false }),
+  closeVoiceMode: () => set({
+    showVoiceMode: false,
+    isInBookingFlow: false, // Reset booking flow when closing voice mode
+  }),
 
   // Voice mode captions (persisted to survive component remounts)
   voiceCaptions: [],
