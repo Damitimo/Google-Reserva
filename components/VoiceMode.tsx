@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mic, Volume2, Sparkles } from 'lucide-react';
 import { GeminiLiveClient } from '@/lib/gemini-live';
 import { AudioRecorder, AudioPlayer, VoiceActivityDetector } from '@/lib/audio-utils';
-import { GeminiIcon } from './ChromeFrame';
 import { useAppStore } from '@/lib/store';
 
 interface VoiceModeProps {
@@ -22,9 +21,14 @@ export default function VoiceMode({ isOpen, onClose }: VoiceModeProps) {
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [audioLevel, setAudioLevel] = useState(0);
-  const [userCaption, setUserCaption] = useState<string>('');
-  const [assistantCaption, setAssistantCaption] = useState<string>('');
-  const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
+  const [captionLines, setCaptionLines] = useState<Array<{id: string; speaker: 'user' | 'gemini'; text: string}>>([]);
+  const [currentUserText, setCurrentUserText] = useState<string>('');
+  const [currentGeminiText, setCurrentGeminiText] = useState<string>('');
+  const userCaptionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const assistantWordsRef = useRef<string[]>([]);
+  const wordRevealIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const lastUserTextRef = useRef<string>('');
+  const lastGeminiTextRef = useRef<string>('');
 
   const clientRef = useRef<GeminiLiveClient | null>(null);
   const recorderRef = useRef<AudioRecorder | null>(null);
@@ -56,7 +60,7 @@ export default function VoiceMode({ isOpen, onClose }: VoiceModeProps) {
 CRITICAL RULES:
 1. Only speak your direct responses to the user. NEVER speak your internal thoughts or reasoning out loud.
 2. ALWAYS use check_calendar before confirming any reservation time to ensure the user is free.
-3. If there's a calendar conflict, tell the user about it naturally (e.g., "Oh, I see you have dinner with Sarah at 7pm. How about 5:30pm or 9pm instead?")
+3. If there's a calendar conflict, tell the user about it naturally (e.g., "Oh, I see you have a meeting at 7pm. How about 5:30pm or 9pm instead?")
 4. NEVER make a reservation without EXPLICIT user confirmation.
 5. NEVER charge the card without EXPLICIT payment confirmation. Say "This restaurant requires a $25 deposit to hold the table. Should I charge your card on file?" and WAIT for "yes".
 
@@ -93,13 +97,13 @@ USER PROFILE - You already know Tony (PROACTIVELY DEMONSTRATE THIS KNOWLEDGE):
 - Name: Tony Stark
 - Allergies: Shellfish (shrimp, crab, lobster) - NEVER suggest seafood-heavy restaurants
 - Favorite cuisines: Italian, Japanese, Modern American
-- Usual party: Often dines with girlfriend Pepper
+- Usual party: Often dines with girlfriend Rachael
 - Payment: Google Pay linked
 
 DEMONSTRATE KNOWLEDGE naturally in conversation:
 - "I'll make sure to avoid any shellfish for you"
 - "I know you love Italian - there's a great new spot..."
-- "Is this dinner with Pepper?"
+- "Is this dinner with Rachael?"
 - Reference past preferences when relevant
 
 Reservation flow - WAIT FOR USER CONFIRMATION AT EACH STEP:
@@ -108,7 +112,7 @@ Reservation flow - WAIT FOR USER CONFIRMATION AT EACH STEP:
 3. WAIT for user to answer
 4. Ask about CUISINE if not mentioned: "Any type of food in mind - Italian, Japanese, something else?"
 5. WAIT for user to answer
-6. Ask about COMPANION'S DIETARY RESTRICTIONS (you already know Sarah's): "I know you can't have shellfish - does [he/she/they] have any allergies I should know about?"
+6. Ask about COMPANION'S DIETARY RESTRICTIONS: "I know you can't have shellfish - does Rachael have any allergies I should know about?"
 7. WAIT for user to answer (if none, proceed; if yes, factor into recommendation)
 8. Ask about TIME if not mentioned: "What time works for you?"
 9. WAIT for user to answer
@@ -273,10 +277,44 @@ Remember this is a voice conversation. Be natural and conversational.`;
           // Turn complete - audio response finished
           console.log('[VoiceMode] Turn complete - setting state to listening');
           setVoiceState('listening');
+
+          // Get the final text before clearing
+          const finalText = assistantWordsRef.current.join(' ').trim();
+
+          // Only add if different from last added text
+          if (finalText && finalText !== lastGeminiTextRef.current) {
+            lastGeminiTextRef.current = finalText;
+            setCaptionLines(lines => {
+              // Also check against last line in array
+              const lastLine = lines[lines.length - 1];
+              if (lastLine && lastLine.text === finalText) {
+                return lines;
+              }
+              const newLines = [...lines, { id: `gemini-${Date.now()}`, speaker: 'gemini' as const, text: finalText }];
+              return newLines.slice(-2);
+            });
+          }
+
+          // Clear state
+          setTimeout(() => {
+            setCurrentGeminiText('');
+            assistantWordsRef.current = [];
+            if (wordRevealIntervalRef.current) {
+              clearInterval(wordRevealIntervalRef.current);
+              wordRevealIntervalRef.current = null;
+            }
+          }, 500);
         });
 
         client.on('interrupted', () => {
           player.interrupt();
+          // Clear assistant caption on interrupt
+          setCurrentGeminiText('');
+          assistantWordsRef.current = [];
+          if (wordRevealIntervalRef.current) {
+            clearInterval(wordRevealIntervalRef.current);
+            wordRevealIntervalRef.current = null;
+          }
         });
 
         // Handle tool calls from the model
@@ -457,6 +495,73 @@ Remember this is a voice conversation. Be natural and conversational.`;
           setVoiceState('idle');
         });
 
+        // Listen for native API transcripts (captions)
+        client.on('input_transcript', (text) => {
+          const transcriptText = text as string;
+          console.log('[VoiceMode] User caption:', transcriptText);
+
+          // Update current user text (accumulate)
+          setCurrentUserText(prev => {
+            const newText = prev ? prev + ' ' + transcriptText : transcriptText;
+            lastUserTextRef.current = newText;
+            return newText;
+          });
+
+          // Clear timeout and set new one to finalize the line
+          if (userCaptionTimeoutRef.current) {
+            clearTimeout(userCaptionTimeoutRef.current);
+          }
+          userCaptionTimeoutRef.current = setTimeout(() => {
+            // Move current user text to caption lines
+            if (lastUserTextRef.current && lastUserTextRef.current.trim()) {
+              const textToAdd = lastUserTextRef.current;
+              setCaptionLines(prev => {
+                // Avoid duplicates
+                const lastLine = prev[prev.length - 1];
+                if (lastLine && lastLine.text === textToAdd) {
+                  return prev;
+                }
+                const newLines = [...prev, { id: `user-${Date.now()}`, speaker: 'user' as const, text: textToAdd }];
+                return newLines.slice(-2); // Keep last 2 completed lines
+              });
+              setCurrentUserText('');
+              lastUserTextRef.current = '';
+            }
+          }, 1500);
+        });
+
+        client.on('output_transcript', (text) => {
+          const transcriptText = text as string;
+          console.log('[VoiceMode] Assistant caption chunk:', transcriptText);
+
+          // Accumulate words from the transcript
+          const newWords = transcriptText.trim().split(/\s+/).filter(w => w);
+          assistantWordsRef.current = [...assistantWordsRef.current, ...newWords];
+
+          // Start word-by-word reveal if not already running
+          if (!wordRevealIntervalRef.current && assistantWordsRef.current.length > 0) {
+            let wordIndex = 0;
+            const revealWords = () => {
+              if (wordIndex < assistantWordsRef.current.length) {
+                // Reveal words progressively (show up to current index)
+                const visibleWords = assistantWordsRef.current.slice(0, wordIndex + 1).join(' ');
+                setCurrentGeminiText(visibleWords);
+                wordIndex++;
+              } else {
+                // All words revealed, clear interval
+                if (wordRevealIntervalRef.current) {
+                  clearInterval(wordRevealIntervalRef.current);
+                  wordRevealIntervalRef.current = null;
+                }
+              }
+            };
+
+            // Reveal at ~3 words per second (typical speech pace)
+            wordRevealIntervalRef.current = setInterval(revealWords, 300);
+            revealWords(); // Show first word immediately
+          }
+        });
+
         // Start recording
         let audioChunkCount = 0;
         let lastLevelUpdate = 0;
@@ -496,72 +601,6 @@ Remember this is a voice conversation. Be natural and conversational.`;
 
     connect();
 
-    // Set up speech recognition for captions
-    if (typeof window !== 'undefined') {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.lang = 'en-US';
-
-        recognition.onresult = (event) => {
-          let finalTranscript = '';
-          let interimTranscript = '';
-
-          for (let i = event.resultIndex; i < event.results.length; i++) {
-            const transcript = event.results[i][0].transcript;
-            if (event.results[i].isFinal) {
-              finalTranscript += transcript;
-            } else {
-              interimTranscript += transcript;
-            }
-          }
-
-          // Show user's speech as caption
-          const displayText = finalTranscript || interimTranscript;
-          if (displayText) {
-            setUserCaption(displayText);
-            // Clear after a delay if it's final
-            if (finalTranscript) {
-              setTimeout(() => setUserCaption(''), 3000);
-            }
-          }
-        };
-
-        recognition.onerror = (event) => {
-          console.log('[VoiceMode] Speech recognition error:', event.error);
-          // Restart on certain errors
-          if (event.error === 'no-speech' || event.error === 'aborted') {
-            try {
-              recognition.start();
-            } catch (e) {
-              // Already running
-            }
-          }
-        };
-
-        recognition.onend = () => {
-          // Restart recognition if voice mode is still open
-          if (isOpen && connectionIdRef.current === myConnectionId) {
-            try {
-              recognition.start();
-            } catch (e) {
-              // Already running
-            }
-          }
-        };
-
-        try {
-          recognition.start();
-          speechRecognitionRef.current = recognition;
-          console.log('[VoiceMode] Speech recognition started for captions');
-        } catch (e) {
-          console.log('[VoiceMode] Could not start speech recognition:', e);
-        }
-      }
-    }
-
     // Cleanup
     return () => {
       console.log('[VoiceMode] Cleanup for connection:', myConnectionId);
@@ -569,11 +608,19 @@ Remember this is a voice conversation. Be natural and conversational.`;
       player.dispose();
       clientRef.current?.disconnect();
       vad.reset();
-      // Stop speech recognition
-      if (speechRecognitionRef.current) {
-        speechRecognitionRef.current.stop();
-        speechRecognitionRef.current = null;
+      // Clear caption timeouts and intervals
+      if (userCaptionTimeoutRef.current) {
+        clearTimeout(userCaptionTimeoutRef.current);
       }
+      if (wordRevealIntervalRef.current) {
+        clearInterval(wordRevealIntervalRef.current);
+      }
+      assistantWordsRef.current = [];
+      lastUserTextRef.current = '';
+      lastGeminiTextRef.current = '';
+      setCaptionLines([]);
+      setCurrentUserText('');
+      setCurrentGeminiText('');
       // Only clear the singleton if this is the active connection
       if (activeConnectionId === myConnectionId) {
         activeConnectionId = null;
@@ -735,21 +782,42 @@ Remember this is a voice conversation. Be natural and conversational.`;
           </motion.div>
         )}
 
-        {/* Caption display */}
-        <AnimatePresence>
-          {userCaption && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              className="absolute bottom-20 left-4 right-4 max-w-lg mx-auto"
+        {/* Caption display - scrolling transcript style */}
+        <div className="absolute bottom-24 left-4 right-4 max-w-xl mx-auto space-y-2 overflow-visible">
+          {/* Previous lines (faded) */}
+          {captionLines.map((line) => (
+            <motion.p
+              key={line.id}
+              initial={{ opacity: 0.7 }}
+              animate={{ opacity: 0.4 }}
+              className="text-white/40 text-center text-sm leading-relaxed"
             >
-              <div className="bg-black/60 backdrop-blur-sm rounded-xl px-4 py-3">
-                <p className="text-white text-center text-sm leading-relaxed">{userCaption}</p>
-              </div>
-            </motion.div>
+              {line.speaker === 'gemini' ? 'Gemini' : 'You'}: {line.text}
+            </motion.p>
+          ))}
+
+          {/* Current active line */}
+          {currentGeminiText && (
+            <motion.p
+              key="current-gemini"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-white text-center text-base leading-relaxed"
+            >
+              Gemini: {currentGeminiText}
+            </motion.p>
           )}
-        </AnimatePresence>
+          {currentUserText && !currentGeminiText && (
+            <motion.p
+              key="current-user"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-white text-center text-base leading-relaxed"
+            >
+              You: {currentUserText}
+            </motion.p>
+          )}
+        </div>
 
         {/* Bottom hint */}
         <div className="absolute bottom-8 text-white/40 text-sm">

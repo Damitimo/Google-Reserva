@@ -15,7 +15,9 @@ export type LiveAPIEventType =
   | 'text'
   | 'interrupted'
   | 'turn_complete'
-  | 'tool_call';
+  | 'tool_call'
+  | 'input_transcript'
+  | 'output_transcript';
 
 export interface LiveAPIConfig {
   model?: string;
@@ -140,7 +142,7 @@ export class GeminiLiveClient {
    * Send initial setup message with configuration
    */
   private sendSetup(): void {
-    // Setup for Live API model with audio and tools
+    // Setup for Live API model with audio, tools, and transcription
     const setup: Record<string, unknown> = {
       model: `models/${this.config.model}`,
       generationConfig: {
@@ -153,6 +155,9 @@ export class GeminiLiveClient {
           },
         },
       },
+      // Enable transcription for captions (at setup level, not in generationConfig)
+      inputAudioTranscription: {},
+      outputAudioTranscription: {},
     };
 
     // System instruction as Content object
@@ -229,6 +234,18 @@ export class GeminiLiveClient {
         if (content.interrupted) {
           console.log('[GeminiLive] Interrupted by user');
           this.emit('interrupted');
+        }
+
+        // Input transcription (what user said)
+        if (content.inputTranscription?.text) {
+          console.log('[GeminiLive] Input transcript:', content.inputTranscription.text);
+          this.emit('input_transcript', content.inputTranscription.text);
+        }
+
+        // Output transcription (what AI said)
+        if (content.outputTranscription?.text) {
+          console.log('[GeminiLive] Output transcript:', content.outputTranscription.text);
+          this.emit('output_transcript', content.outputTranscription.text);
         }
       }
 

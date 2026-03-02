@@ -10,7 +10,7 @@ const mockCalendarEvents = [
   },
   {
     id: '2',
-    title: 'Dinner with Sarah',
+    title: 'Board Meeting',
     start: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0] + 'T19:00:00',
     end: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0] + 'T21:00:00',
   },
