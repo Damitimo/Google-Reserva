@@ -432,9 +432,12 @@ export default function Chat() {
           </div>
         ) : (
           <div className="space-y-4">
-            {messages.map((message, index) => (
+            {/* Check if any message has a reminder confirmation */}
+            {(() => {
+              const reminderAlreadySet = messages.some(m => m.reminderConfirmation);
+              return messages.map((message, index) => (
               <div key={message.id}>
-                <MessageBubble message={message} isLoading={isLoading} onQuickReply={handleQuickReply} isLastMessage={index === messages.length - 1} />
+                <MessageBubble message={message} isLoading={isLoading} onQuickReply={handleQuickReply} isLastMessage={index === messages.length - 1} reminderAlreadySet={reminderAlreadySet} />
                 {/* Calendar check animation - appears after the time selection message */}
                 {calendarCheckAfterMessageId === message.id && (
                   <motion.div
@@ -461,7 +464,8 @@ export default function Chat() {
                   </motion.div>
                 )}
               </div>
-            ))}
+            ));
+            })()}
             <div ref={messagesEndRef} />
           </div>
         )}
@@ -817,7 +821,7 @@ function ReservationCard({ reservation }: { reservation: Reservation }) {
   );
 }
 
-function MessageBubble({ message, isLoading, onQuickReply, isLastMessage }: { message: Message; isLoading: boolean; onQuickReply: (reply: QuickReply) => void; isLastMessage: boolean }) {
+function MessageBubble({ message, isLoading, onQuickReply, isLastMessage, reminderAlreadySet }: { message: Message; isLoading: boolean; onQuickReply: (reply: QuickReply) => void; isLastMessage: boolean; reminderAlreadySet: boolean }) {
   const isUser = message.role === 'user';
   const showLoading = isLoading && isLastMessage && !message.content;
   const buttonsActive = isLastMessage && !isLoading;
@@ -1034,14 +1038,17 @@ function MessageBubble({ message, isLoading, onQuickReply, isLastMessage }: { me
                   </div>
                   <CheckCircle2 className="w-4 h-4 text-google-green flex-shrink-0" />
                 </motion.div>
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.8 }}
-                  className="mt-2"
-                >
-                  <CancelReminderPrompt />
-                </motion.div>
+                {/* Only show reminder prompt if no reminder has been set yet */}
+                {!reminderAlreadySet && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.8 }}
+                    className="mt-2"
+                  >
+                    <CancelReminderPrompt />
+                  </motion.div>
+                )}
               </>
             )}
           </div>
