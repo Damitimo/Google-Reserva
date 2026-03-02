@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mic, Volume2 } from 'lucide-react';
+import { X, Mic, Volume2, Sparkles } from 'lucide-react';
 import { GeminiLiveClient } from '@/lib/gemini-live';
 import { AudioRecorder, AudioPlayer, VoiceActivityDetector } from '@/lib/audio-utils';
 import { GeminiIcon } from './ChromeFrame';
@@ -548,8 +548,8 @@ Remember this is a voice conversation. Be natural and conversational.`;
         </button>
 
         {/* Header */}
-        <div className="absolute top-6 left-6 flex items-center gap-3">
-          <GeminiIcon className="w-8 h-8" />
+        <div className="absolute top-6 left-4 flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-white" />
           <span className="text-white font-medium">Gemini Agent</span>
         </div>
 
@@ -628,7 +628,7 @@ Remember this is a voice conversation. Be natural and conversational.`;
           key={voiceState}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-center mb-8"
+          className="text-center mt-6 mb-8"
         >
           <p className="text-white/80 text-lg">
             {voiceState === 'connecting' && 'Connecting...'}
