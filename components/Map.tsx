@@ -70,7 +70,7 @@ function RestaurantMarker({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 10, scale: 0.9 }}
               className="absolute bottom-full mb-3 w-56"
-              style={{ left: '50%', transform: 'translateX(-50%)' }}
+              style={{ left: '50%', transform: 'translateX(-65%)' }}
             >
               <div className="bg-white rounded-xl shadow-xl p-3 border border-gray-100">
                 <h3 className="font-semibold text-gray-900 truncate">{restaurant.name}</h3>
