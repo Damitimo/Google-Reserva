@@ -364,7 +364,7 @@ export class VoiceActivityDetector {
           this.speaking = false;
           this.onSpeechEnd?.();
           this.silenceTimeout = null;
-        }, 500); // 500ms of silence to end
+        }, 400); // 400ms of silence to end (reduced from 500ms for snappier response)
       }
     }
 
