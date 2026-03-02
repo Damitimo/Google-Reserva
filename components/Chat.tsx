@@ -432,12 +432,12 @@ export default function Chat() {
                 <div className="flex items-center gap-3">
                   <img
                     src="https://i.pravatar.cc/150?img=68"
-                    alt="Tony Stark"
+                    alt="Timothy"
                     className="w-10 h-10 rounded-full"
                   />
                   <div>
-                    <p className="text-sm font-medium text-gray-900">Tony Stark</p>
-                    <p className="text-xs text-gray-500">tony@stark.com</p>
+                    <p className="text-sm font-medium text-gray-900">Timothy</p>
+                    <p className="text-xs text-gray-500">timothy@email.com</p>
                   </div>
                 </div>
               </div>
@@ -468,12 +468,12 @@ export default function Chat() {
           {/* User Profile */}
           <div className="flex items-center gap-2">
             <div className="text-right">
-              <p className="text-xs sm:text-sm font-medium text-gray-900">Tony Stark</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-900">Timothy</p>
               <p className="text-[10px] sm:text-xs text-gray-500">Google Pay linked</p>
             </div>
             <img
               src="https://i.pravatar.cc/150?img=68"
-              alt="Tony Stark"
+              alt="Timothy"
               className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-google-blue"
             />
           </div>
@@ -493,7 +493,7 @@ export default function Chat() {
                 <Sparkles className="w-8 h-8 text-white" />
               </div>
               <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                Hi Tony, what can I help you with?
+                Hi Timothy, what can I help you with?
               </h2>
               <p className="text-gray-500 mb-6">
                 I can find restaurants, make reservations, and manage your bookings.
