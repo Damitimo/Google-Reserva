@@ -628,19 +628,23 @@ Remember this is a voice conversation. Be natural and conversational.`;
 
         {/* Main visualization */}
         <div className="relative flex items-center justify-center mb-12">
-          {/* Animated rings */}
+          {/* Animated rings - always have subtle pulsing animation for mobile compatibility */}
           <motion.div
             className="absolute w-48 h-48 rounded-full"
             style={{
               background: 'linear-gradient(135deg, rgba(66, 133, 244, 0.2), rgba(155, 114, 203, 0.2), rgba(217, 101, 112, 0.2))',
             }}
             animate={{
-              scale: voiceState === 'listening' ? 1 + audioLevel * 0.2 : voiceState === 'speaking' ? [1, 1.15, 1] : 1,
+              scale: voiceState === 'listening'
+                ? [1 + audioLevel * 0.2, 1 + audioLevel * 0.2 + 0.08, 1 + audioLevel * 0.2]
+                : voiceState === 'speaking'
+                  ? [1, 1.15, 1]
+                  : [1, 1.05, 1],
             }}
             transition={{
-              duration: voiceState === 'speaking' ? 0.8 : 0.3,
-              repeat: voiceState === 'speaking' ? Infinity : 0,
-              ease: 'easeOut',
+              duration: voiceState === 'speaking' ? 0.8 : 1.2,
+              repeat: Infinity,
+              ease: 'easeInOut',
             }}
           />
           <motion.div
@@ -649,13 +653,17 @@ Remember this is a voice conversation. Be natural and conversational.`;
               background: 'linear-gradient(135deg, rgba(66, 133, 244, 0.3), rgba(155, 114, 203, 0.3), rgba(217, 101, 112, 0.3))',
             }}
             animate={{
-              scale: voiceState === 'listening' ? 1 + audioLevel * 0.25 : voiceState === 'speaking' ? [1, 1.2, 1] : 1,
+              scale: voiceState === 'listening'
+                ? [1 + audioLevel * 0.25, 1 + audioLevel * 0.25 + 0.1, 1 + audioLevel * 0.25]
+                : voiceState === 'speaking'
+                  ? [1, 1.2, 1]
+                  : [1, 1.06, 1],
             }}
             transition={{
-              duration: voiceState === 'speaking' ? 0.7 : 0.3,
-              repeat: voiceState === 'speaking' ? Infinity : 0,
-              delay: voiceState === 'speaking' ? 0.1 : 0,
-              ease: 'easeOut',
+              duration: voiceState === 'speaking' ? 0.7 : 1.0,
+              repeat: Infinity,
+              delay: 0.1,
+              ease: 'easeInOut',
             }}
           />
           <motion.div
@@ -664,13 +672,17 @@ Remember this is a voice conversation. Be natural and conversational.`;
               background: 'linear-gradient(135deg, rgba(66, 133, 244, 0.5), rgba(155, 114, 203, 0.5), rgba(217, 101, 112, 0.5))',
             }}
             animate={{
-              scale: voiceState === 'listening' ? 1 + audioLevel * 0.3 : voiceState === 'speaking' ? [1, 1.25, 1] : 1,
+              scale: voiceState === 'listening'
+                ? [1 + audioLevel * 0.3, 1 + audioLevel * 0.3 + 0.12, 1 + audioLevel * 0.3]
+                : voiceState === 'speaking'
+                  ? [1, 1.25, 1]
+                  : [1, 1.07, 1],
             }}
             transition={{
-              duration: voiceState === 'speaking' ? 0.6 : 0.3,
-              repeat: voiceState === 'speaking' ? Infinity : 0,
-              delay: voiceState === 'speaking' ? 0.2 : 0,
-              ease: 'easeOut',
+              duration: voiceState === 'speaking' ? 0.6 : 0.8,
+              repeat: Infinity,
+              delay: 0.2,
+              ease: 'easeInOut',
             }}
           />
 
