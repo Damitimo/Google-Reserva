@@ -92,6 +92,15 @@ interface AppStore {
   showVoiceMode: boolean;
   openVoiceMode: () => void;
   closeVoiceMode: () => void;
+
+  // Voice mode captions (persisted to survive component remounts)
+  voiceCaptions: Array<{id: string; speaker: 'user' | 'gemini'; text: string}>;
+  currentUserCaption: string;
+  currentGeminiCaption: string;
+  addVoiceCaption: (speaker: 'user' | 'gemini', text: string) => void;
+  setCurrentUserCaption: (text: string) => void;
+  setCurrentGeminiCaption: (text: string) => void;
+  clearVoiceCaptions: () => void;
 }
 
 export const useAppStore = create<AppStore>((set, get) => ({
@@ -298,4 +307,16 @@ export const useAppStore = create<AppStore>((set, get) => ({
   showVoiceMode: false,
   openVoiceMode: () => set({ showVoiceMode: true }),
   closeVoiceMode: () => set({ showVoiceMode: false }),
+
+  // Voice mode captions (persisted to survive component remounts)
+  voiceCaptions: [],
+  currentUserCaption: '',
+  currentGeminiCaption: '',
+  addVoiceCaption: (speaker, text) =>
+    set((state) => ({
+      voiceCaptions: [...state.voiceCaptions, { id: `${speaker}-${Date.now()}`, speaker, text }].slice(-3),
+    })),
+  setCurrentUserCaption: (text) => set({ currentUserCaption: text }),
+  setCurrentGeminiCaption: (text) => set({ currentGeminiCaption: text }),
+  clearVoiceCaptions: () => set({ voiceCaptions: [], currentUserCaption: '', currentGeminiCaption: '' }),
 }));

@@ -21,9 +21,6 @@ export default function VoiceMode({ isOpen, onClose }: VoiceModeProps) {
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [audioLevel, setAudioLevel] = useState(0);
-  const [captionLines, setCaptionLines] = useState<Array<{id: string; speaker: 'user' | 'gemini'; text: string}>>([]);
-  const [currentUserText, setCurrentUserText] = useState<string>('');
-  const [currentGeminiText, setCurrentGeminiText] = useState<string>('');
   const userCaptionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const assistantWordsRef = useRef<string[]>([]);
   const wordRevealIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -38,6 +35,15 @@ export default function VoiceMode({ isOpen, onClose }: VoiceModeProps) {
 
   const addMessage = useAppStore((state) => state.addMessage);
   const updateBookingContext = useAppStore((state) => state.updateBookingContext);
+
+  // Use global store for captions (persists across remounts)
+  const captionLines = useAppStore((state) => state.voiceCaptions);
+  const currentUserText = useAppStore((state) => state.currentUserCaption);
+  const currentGeminiText = useAppStore((state) => state.currentGeminiCaption);
+  const addVoiceCaption = useAppStore((state) => state.addVoiceCaption);
+  const setCurrentUserCaption = useAppStore((state) => state.setCurrentUserCaption);
+  const setCurrentGeminiCaption = useAppStore((state) => state.setCurrentGeminiCaption);
+  const clearVoiceCaptions = useAppStore((state) => state.clearVoiceCaptions);
 
   // Initialize and connect
   useEffect(() => {
@@ -74,7 +80,8 @@ Your personality:
 - Warm, knowledgeable, and efficient
 - Speak naturally like a trusted friend who knows all the best spots
 - Keep responses concise (2-3 sentences max)
-- Be PROACTIVE with helpful insights
+- Be helpful but NOT presumptuous - wait for the user to tell you what they need
+- NEVER assume the user wants dinner - they might want lunch, brunch, or something else
 
 CONTEXT INFERENCE - Be smart about understanding context:
 - "dinner with girlfriend/boyfriend/wife/husband" = 2 people, romantic occasion (DON'T ask how many)
@@ -97,13 +104,18 @@ USER PROFILE - You already know Timothy (PROACTIVELY DEMONSTRATE THIS KNOWLEDGE)
 - Name: Timothy
 - Allergies: Shellfish (shrimp, crab, lobster) - NEVER suggest seafood-heavy restaurants
 - Favorite cuisines: Italian, Japanese, Modern American
-- Usual party: Often dines with girlfriend Rachael
+- Usual party: Often dines with girlfriend
 - Payment: Google Pay linked
 
-DEMONSTRATE KNOWLEDGE naturally in conversation:
+GREETING BEHAVIOR:
+- When user greets you (e.g., "Hey Gemini", "Hi", "Hello"), respond warmly and ask how you can help
+- Example: "Hey Timothy! How can I help you today?" or "Hi there! What can I do for you?"
+- NEVER assume what the user wants - let them tell you first
+- Don't say things like "Thinking about dinner?" - wait for them to specify
+
+DEMONSTRATE KNOWLEDGE naturally in conversation (only AFTER user tells you what they want):
 - "I'll make sure to avoid any shellfish for you"
 - "I know you love Italian - there's a great new spot..."
-- "Is this dinner with Rachael?"
 - Reference past preferences when relevant
 
 Reservation flow - WAIT FOR USER CONFIRMATION AT EACH STEP:
@@ -112,7 +124,7 @@ Reservation flow - WAIT FOR USER CONFIRMATION AT EACH STEP:
 3. WAIT for user to answer
 4. Ask about CUISINE if not mentioned: "Any type of food in mind - Italian, Japanese, something else?"
 5. WAIT for user to answer
-6. Ask about COMPANION'S DIETARY RESTRICTIONS: "I know you can't have shellfish - does Rachael have any allergies I should know about?"
+6. Ask about COMPANION'S DIETARY RESTRICTIONS: "I know you can't have shellfish - does your guest have any allergies I should know about?"
 7. WAIT for user to answer (if none, proceed; if yes, factor into recommendation)
 8. Ask about TIME if not mentioned: "What time works for you?"
 9. WAIT for user to answer
@@ -284,20 +296,12 @@ Remember this is a voice conversation. Be natural and conversational.`;
           // Only add if different from last added text
           if (finalText && finalText !== lastGeminiTextRef.current) {
             lastGeminiTextRef.current = finalText;
-            setCaptionLines(lines => {
-              // Also check against last line in array
-              const lastLine = lines[lines.length - 1];
-              if (lastLine && lastLine.text === finalText) {
-                return lines;
-              }
-              const newLines = [...lines, { id: `gemini-${Date.now()}`, speaker: 'gemini' as const, text: finalText }];
-              return newLines.slice(-2);
-            });
+            addVoiceCaption('gemini', finalText);
           }
 
           // Clear state
           setTimeout(() => {
-            setCurrentGeminiText('');
+            setCurrentGeminiCaption('');
             assistantWordsRef.current = [];
             if (wordRevealIntervalRef.current) {
               clearInterval(wordRevealIntervalRef.current);
@@ -309,7 +313,7 @@ Remember this is a voice conversation. Be natural and conversational.`;
         client.on('interrupted', () => {
           player.interrupt();
           // Clear assistant caption on interrupt
-          setCurrentGeminiText('');
+          setCurrentGeminiCaption('');
           assistantWordsRef.current = [];
           if (wordRevealIntervalRef.current) {
             clearInterval(wordRevealIntervalRef.current);
@@ -501,11 +505,9 @@ Remember this is a voice conversation. Be natural and conversational.`;
           console.log('[VoiceMode] User caption:', transcriptText);
 
           // Update current user text (accumulate)
-          setCurrentUserText(prev => {
-            const newText = prev ? prev + ' ' + transcriptText : transcriptText;
-            lastUserTextRef.current = newText;
-            return newText;
-          });
+          const newText = currentUserText ? currentUserText + ' ' + transcriptText : transcriptText;
+          lastUserTextRef.current = newText;
+          setCurrentUserCaption(newText);
 
           // Clear timeout and set new one to finalize the line
           if (userCaptionTimeoutRef.current) {
@@ -515,16 +517,8 @@ Remember this is a voice conversation. Be natural and conversational.`;
             // Move current user text to caption lines
             if (lastUserTextRef.current && lastUserTextRef.current.trim()) {
               const textToAdd = lastUserTextRef.current;
-              setCaptionLines(prev => {
-                // Avoid duplicates
-                const lastLine = prev[prev.length - 1];
-                if (lastLine && lastLine.text === textToAdd) {
-                  return prev;
-                }
-                const newLines = [...prev, { id: `user-${Date.now()}`, speaker: 'user' as const, text: textToAdd }];
-                return newLines.slice(-2); // Keep last 2 completed lines
-              });
-              setCurrentUserText('');
+              addVoiceCaption('user', textToAdd);
+              setCurrentUserCaption('');
               lastUserTextRef.current = '';
             }
           }, 1500);
@@ -545,7 +539,7 @@ Remember this is a voice conversation. Be natural and conversational.`;
               if (wordIndex < assistantWordsRef.current.length) {
                 // Reveal words progressively (show up to current index)
                 const visibleWords = assistantWordsRef.current.slice(0, wordIndex + 1).join(' ');
-                setCurrentGeminiText(visibleWords);
+                setCurrentGeminiCaption(visibleWords);
                 wordIndex++;
               } else {
                 // All words revealed, clear interval
@@ -618,9 +612,7 @@ Remember this is a voice conversation. Be natural and conversational.`;
       assistantWordsRef.current = [];
       lastUserTextRef.current = '';
       lastGeminiTextRef.current = '';
-      setCaptionLines([]);
-      setCurrentUserText('');
-      setCurrentGeminiText('');
+      // Note: Don't clear global caption state on cleanup - it persists across remounts
       // Only clear the singleton if this is the active connection
       if (activeConnectionId === myConnectionId) {
         activeConnectionId = null;
@@ -782,45 +774,35 @@ Remember this is a voice conversation. Be natural and conversational.`;
           </motion.div>
         )}
 
-        {/* Caption display - scrolling transcript style */}
-        <div className="absolute bottom-24 left-4 right-4 max-w-xl mx-auto space-y-2 overflow-visible">
-          {/* Previous lines (faded) */}
-          {captionLines.map((line) => (
-            <motion.p
-              key={line.id}
-              initial={{ opacity: 0.7 }}
-              animate={{ opacity: 0.4 }}
-              className="text-white/40 text-center text-sm leading-relaxed"
-            >
-              {line.speaker === 'gemini' ? 'Gemini' : 'You'}: {line.text}
-            </motion.p>
-          ))}
+        {/* Caption display - fixed at bottom, always visible */}
+        <div style={{ position: 'fixed', bottom: '70px', left: 0, right: 0, padding: '0 32px', zIndex: 9999 }}>
+          <div style={{ maxWidth: '600px', margin: '0 auto' }}>
+            {/* Previous lines (faded) */}
+            {captionLines.map((line) => (
+              <p
+                key={line.id}
+                style={{ color: 'rgba(255,255,255,0.5)', textAlign: 'center', fontSize: '14px', lineHeight: '1.6', margin: '6px 0' }}
+              >
+                {line.speaker === 'gemini' ? 'Gemini' : 'You'}: {line.text}
+              </p>
+            ))}
 
-          {/* Current active line */}
-          {currentGeminiText && (
-            <motion.p
-              key="current-gemini"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-white text-center text-base leading-relaxed"
-            >
-              Gemini: {currentGeminiText}
-            </motion.p>
-          )}
-          {currentUserText && !currentGeminiText && (
-            <motion.p
-              key="current-user"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-white text-center text-base leading-relaxed"
-            >
-              You: {currentUserText}
-            </motion.p>
-          )}
+            {/* Current active line */}
+            {currentGeminiText && (
+              <p style={{ color: 'white', textAlign: 'center', fontSize: '16px', lineHeight: '1.6', margin: '6px 0' }}>
+                Gemini: {currentGeminiText}
+              </p>
+            )}
+            {currentUserText && !currentGeminiText && (
+              <p style={{ color: 'white', textAlign: 'center', fontSize: '16px', lineHeight: '1.6', margin: '6px 0' }}>
+                You: {currentUserText}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Bottom hint */}
-        <div className="absolute bottom-8 text-white/40 text-sm">
+        <div className="fixed bottom-4 md:bottom-8 left-0 right-0 text-white/40 text-xs text-center px-4 z-[210]">
           Speak naturally • Gemini will respond in real-time
         </div>
       </motion.div>

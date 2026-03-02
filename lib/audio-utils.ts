@@ -14,6 +14,8 @@ export class AudioRecorder {
   private onAudioData: ((pcmData: ArrayBuffer) => void) | null = null;
   private isRecording = false;
   private isMuted = false; // Mute while AI is speaking to prevent echo
+  private nativeSampleRate = 48000; // Will be set to actual rate
+  private readonly targetSampleRate = 16000; // Gemini expects 16kHz
 
   /**
    * Start recording from microphone
@@ -24,18 +26,24 @@ export class AudioRecorder {
 
     try {
       // Request microphone access with strong echo cancellation
+      // Don't specify sampleRate - mobile browsers ignore it anyway
       this.mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           channelCount: 1,
-          sampleRate: 16000,
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
         },
       });
 
-      // Create audio context at 16kHz
-      this.audioContext = new AudioContext({ sampleRate: 16000 });
+      // Create audio context at device's native rate (mobile browsers ignore custom rates)
+      this.audioContext = new AudioContext();
+      this.nativeSampleRate = this.audioContext.sampleRate;
+
+      // Resume context (required for mobile browsers after user gesture)
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
 
       // Create source from microphone
       this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream);
@@ -47,7 +55,13 @@ export class AudioRecorder {
         if (!this.isRecording || this.isMuted) return;
 
         const inputData = event.inputBuffer.getChannelData(0);
-        const pcmData = this.float32ToPCM16(inputData);
+
+        // Resample from native rate to 16kHz if needed
+        const resampledData = this.nativeSampleRate !== this.targetSampleRate
+          ? this.resample(inputData, this.nativeSampleRate, this.targetSampleRate)
+          : inputData;
+
+        const pcmData = this.float32ToPCM16(resampledData);
 
         if (this.onAudioData) {
           this.onAudioData(pcmData);
@@ -59,7 +73,7 @@ export class AudioRecorder {
       processorNode.connect(this.audioContext.destination);
 
       this.isRecording = true;
-      console.log('[AudioRecorder] Started recording at 16kHz');
+      console.log(`[AudioRecorder] Started recording at ${this.nativeSampleRate}Hz, resampling to ${this.targetSampleRate}Hz`);
     } catch (error) {
       console.error('[AudioRecorder] Failed to start:', error);
       throw error;
@@ -126,6 +140,28 @@ export class AudioRecorder {
       pcm16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
     }
     return pcm16.buffer;
+  }
+
+  /**
+   * Resample audio from source rate to target rate using linear interpolation
+   * This is crucial for mobile browsers that ignore AudioContext sample rate settings
+   */
+  private resample(inputData: Float32Array, sourceRate: number, targetRate: number): Float32Array {
+    const ratio = sourceRate / targetRate;
+    const outputLength = Math.floor(inputData.length / ratio);
+    const output = new Float32Array(outputLength);
+
+    for (let i = 0; i < outputLength; i++) {
+      const srcIndex = i * ratio;
+      const srcIndexFloor = Math.floor(srcIndex);
+      const srcIndexCeil = Math.min(srcIndexFloor + 1, inputData.length - 1);
+      const fraction = srcIndex - srcIndexFloor;
+
+      // Linear interpolation between samples
+      output[i] = inputData[srcIndexFloor] * (1 - fraction) + inputData[srcIndexCeil] * fraction;
+    }
+
+    return output;
   }
 }
 
