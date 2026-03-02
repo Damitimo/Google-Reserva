@@ -5,7 +5,7 @@ import { useAppStore } from '@/lib/store';
 import { Message, Restaurant, Reservation, QuickReply } from '@/types';
 import RestaurantCard from './RestaurantCard';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Mic, MicOff, Sparkles, Calendar, Users, MapPin, Edit3, X, CheckCircle2, XCircle, CreditCard, Clock, ChevronDown, Shield, AlertTriangle, Leaf, Podcast, Menu } from 'lucide-react';
+import { Send, Mic, MicOff, Sparkles, Calendar, Users, MapPin, Edit3, X, CheckCircle2, XCircle, CreditCard, Clock, ChevronDown, Shield, AlertTriangle, Leaf, Podcast, Menu, History, Search, CalendarDays } from 'lucide-react';
 import VoiceMode from './VoiceMode';
 import ReactMarkdown from 'react-markdown';
 
@@ -47,6 +47,7 @@ export default function Chat() {
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(false); // TTS disabled - voice mode handles audio
+  const [showMenu, setShowMenu] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -370,9 +371,48 @@ export default function Chat() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-3">
             {/* Hamburger Menu */}
-            <button className="w-9 h-9 md:w-10 md:h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors">
-              <Menu className="w-5 h-5 md:w-6 md:h-6 text-gray-600" />
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setShowMenu(!showMenu)}
+                className="w-9 h-9 md:w-10 md:h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+              >
+                <Menu className="w-5 h-5 md:w-6 md:h-6 text-gray-600" />
+              </button>
+
+              {/* Dropdown Menu */}
+              <AnimatePresence>
+                {showMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-50"
+                  >
+                    <button
+                      onClick={() => setShowMenu(false)}
+                      className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left"
+                    >
+                      <CalendarDays className="w-5 h-5 text-google-blue" />
+                      <span className="text-sm text-gray-700">My Reservations</span>
+                    </button>
+                    <button
+                      onClick={() => setShowMenu(false)}
+                      className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left"
+                    >
+                      <History className="w-5 h-5 text-google-green" />
+                      <span className="text-sm text-gray-700">History</span>
+                    </button>
+                    <button
+                      onClick={() => setShowMenu(false)}
+                      className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left"
+                    >
+                      <Search className="w-5 h-5 text-google-yellow" />
+                      <span className="text-sm text-gray-700">Search</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
             <div>
               <h1 className="font-semibold text-gray-900 text-sm md:text-base">Gemini Agent</h1>
               <div className="flex items-center gap-1.5">
