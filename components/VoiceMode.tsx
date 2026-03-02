@@ -22,6 +22,9 @@ export default function VoiceMode({ isOpen, onClose }: VoiceModeProps) {
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [error, setError] = useState<string | null>(null);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [userCaption, setUserCaption] = useState<string>('');
+  const [assistantCaption, setAssistantCaption] = useState<string>('');
+  const speechRecognitionRef = useRef<SpeechRecognition | null>(null);
 
   const clientRef = useRef<GeminiLiveClient | null>(null);
   const recorderRef = useRef<AudioRecorder | null>(null);
@@ -263,7 +266,6 @@ Remember this is a voice conversation. Be natural and conversational.`;
         client.on('text', (text) => {
           // Note: For native audio model, text output is internal "thinking"
           // which shouldn't be displayed to users. The audio IS the response.
-          // Only log for debugging, don't show in UI.
           console.log('[VoiceMode] Text (internal):', (text as string).substring(0, 100));
         });
 
@@ -494,6 +496,72 @@ Remember this is a voice conversation. Be natural and conversational.`;
 
     connect();
 
+    // Set up speech recognition for captions
+    if (typeof window !== 'undefined') {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onresult = (event) => {
+          let finalTranscript = '';
+          let interimTranscript = '';
+
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const transcript = event.results[i][0].transcript;
+            if (event.results[i].isFinal) {
+              finalTranscript += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          // Show user's speech as caption
+          const displayText = finalTranscript || interimTranscript;
+          if (displayText) {
+            setUserCaption(displayText);
+            // Clear after a delay if it's final
+            if (finalTranscript) {
+              setTimeout(() => setUserCaption(''), 3000);
+            }
+          }
+        };
+
+        recognition.onerror = (event) => {
+          console.log('[VoiceMode] Speech recognition error:', event.error);
+          // Restart on certain errors
+          if (event.error === 'no-speech' || event.error === 'aborted') {
+            try {
+              recognition.start();
+            } catch (e) {
+              // Already running
+            }
+          }
+        };
+
+        recognition.onend = () => {
+          // Restart recognition if voice mode is still open
+          if (isOpen && connectionIdRef.current === myConnectionId) {
+            try {
+              recognition.start();
+            } catch (e) {
+              // Already running
+            }
+          }
+        };
+
+        try {
+          recognition.start();
+          speechRecognitionRef.current = recognition;
+          console.log('[VoiceMode] Speech recognition started for captions');
+        } catch (e) {
+          console.log('[VoiceMode] Could not start speech recognition:', e);
+        }
+      }
+    }
+
     // Cleanup
     return () => {
       console.log('[VoiceMode] Cleanup for connection:', myConnectionId);
@@ -501,6 +569,11 @@ Remember this is a voice conversation. Be natural and conversational.`;
       player.dispose();
       clientRef.current?.disconnect();
       vad.reset();
+      // Stop speech recognition
+      if (speechRecognitionRef.current) {
+        speechRecognitionRef.current.stop();
+        speechRecognitionRef.current = null;
+      }
       // Only clear the singleton if this is the active connection
       if (activeConnectionId === myConnectionId) {
         activeConnectionId = null;
@@ -649,6 +722,22 @@ Remember this is a voice conversation. Be natural and conversational.`;
             <p className="text-red-300 text-sm">{error}</p>
           </motion.div>
         )}
+
+        {/* Caption display */}
+        <AnimatePresence>
+          {userCaption && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="absolute bottom-20 left-4 right-4 max-w-lg mx-auto"
+            >
+              <div className="bg-black/60 backdrop-blur-sm rounded-xl px-4 py-3">
+                <p className="text-white text-center text-sm leading-relaxed">{userCaption}</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Bottom hint */}
         <div className="absolute bottom-8 text-white/40 text-sm">
