@@ -453,9 +453,9 @@ export default function Chat() {
             {/* Hamburger Menu */}
             <button
               onClick={() => setShowMenu(true)}
-              className="w-9 h-9 md:w-10 md:h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+              className="w-10 h-10 md:w-10 md:h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
             >
-              <Menu className="w-5 h-5 md:w-6 md:h-6 text-gray-600" />
+              <Menu className="w-6 h-6 md:w-6 md:h-6 text-gray-600" />
             </button>
             <div>
               <h1 className="font-semibold text-gray-900 text-sm md:text-base">Gemini Agent</h1>
@@ -594,14 +594,14 @@ export default function Chat() {
           <button
             onClick={() => handleSubmit()}
             disabled={!input.trim() || isLoading}
-            className="flex-shrink-0 w-11 h-11 md:w-12 md:h-12 rounded-full bg-google-blue text-white flex items-center justify-center hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-google-blue/30"
+            className="flex-shrink-0 w-11 h-11 md:w-12 md:h-12 rounded-full bg-google-blue text-white flex items-center justify-center hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-google-blue/30 -mt-1 md:mt-0"
           >
             <Send className="w-5 h-5" />
           </button>
           {/* Voice Mode Button */}
           <button
             onClick={openVoiceMode}
-            className="flex-shrink-0 w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all shadow-lg"
+            className="flex-shrink-0 w-11 h-11 md:w-12 md:h-12 rounded-full flex items-center justify-center transition-all shadow-lg -mt-1 md:mt-0"
             style={{
               background: 'linear-gradient(135deg, #4285F4, #9B72CB, #D96570)',
             }}
