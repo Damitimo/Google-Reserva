@@ -176,6 +176,11 @@ export default function Chat() {
       lastProcessedMessage = pendingBookingMessage;
       const message = pendingBookingMessage;
       clearPendingBookingMessage();
+
+      // Set booking flow flag BEFORE making the API call
+      // This ensures the server knows we're in booking mode from the start
+      setIsInBookingFlow(true);
+
       handleSubmit(message).finally(() => {
         isProcessingBooking = false;
         // Reset lastProcessedMessage after a delay to allow rebooking same restaurant
@@ -193,6 +198,13 @@ export default function Chat() {
     // Clear calendar check if this is not a time selection (no customMessageId)
     if (!customMessageId) {
       setCalendarCheckAfterMessageId(null);
+    }
+
+    // Detect booking intent from message text and set booking flow flag early
+    // This ensures the server knows we're starting a booking from the first request
+    const bookingIntentPattern = /^(I'd like to book|book|reserve)\s+/i;
+    if (bookingIntentPattern.test(messageText) && !isInBookingFlow) {
+      setIsInBookingFlow(true);
     }
 
     setInput('');
@@ -217,6 +229,7 @@ export default function Chat() {
     addMessage(assistantMessage);
 
     try {
+      // Send booking context to the server for explicit state tracking
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -225,6 +238,18 @@ export default function Chat() {
             role: m.role,
             content: m.content,
           })),
+          // Include booking context for explicit state tracking (fixes context loss bug)
+          bookingContext: isInBookingFlow ? {
+            isInBookingFlow: true,
+            restaurant: bookingContext.restaurant ? {
+              id: bookingContext.restaurant.id,
+              name: bookingContext.restaurant.name,
+            } : null,
+            partySize: bookingContext.partySize,
+            dietaryRestrictions: bookingContext.dietaryRestrictions,
+            date: bookingContext.date,
+            time: bookingContext.time,
+          } : undefined,
         }),
       });
 
@@ -279,8 +304,20 @@ export default function Chat() {
         updateBookingContext({
           restaurant: data.bookingSummary.restaurant,
           partySize: data.bookingSummary.partySize,
+          dietaryRestrictions: data.bookingSummary.dietaryRestrictions || null,
           date: data.bookingSummary.date,
           time: data.bookingSummary.time,
+          step: 'collecting',
+        });
+      }
+      // Also sync partial booking data (Fix: ensures context is updated at each step)
+      else if (data.collectedBookingData) {
+        updateBookingContext({
+          restaurant: data.collectedBookingData.restaurant,
+          partySize: data.collectedBookingData.partySize,
+          dietaryRestrictions: data.collectedBookingData.dietaryRestrictions,
+          date: data.collectedBookingData.date,
+          time: data.collectedBookingData.time,
           step: 'collecting',
         });
       }

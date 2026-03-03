@@ -218,7 +218,126 @@ const tools: Tool[] = [
   },
 ];
 
-function getSystemPrompt(): string {
+// Booking context passed from client for explicit state tracking
+interface BookingContextFromClient {
+  restaurant?: { id?: string; name: string } | null;
+  partySize?: number | null;
+  dietaryRestrictions?: string | null;
+  date?: string | null;
+  time?: string | null;
+  isInBookingFlow?: boolean;
+}
+
+// Parse booking information from user message text
+function parseBookingInfoFromMessage(message: string, currentContext: BookingContextFromClient | undefined): {
+  partySize?: number;
+  dietaryRestrictions?: string;
+  date?: string;
+  time?: string;
+} {
+  const extracted: {
+    partySize?: number;
+    dietaryRestrictions?: string;
+    date?: string;
+    time?: string;
+  } = {};
+
+  const lowerMessage = message.toLowerCase().trim();
+
+  // Parse party size - various formats
+  const partySizePatterns = [
+    /^(\d+)\s*(?:people|guests|persons?)?$/i,           // "4", "4 people", "4 guests"
+    /^(two|three|four|five|six|seven|eight|nine|ten)(?:\s*(?:people|guests|persons?))?$/i,
+    /(?:party of|for)\s*(\d+)/i,                         // "party of 4", "for 4"
+    /^just\s*(\d+)$/i,                                   // "just 4"
+    /^(\d+)\s*of us$/i,                                  // "4 of us"
+  ];
+
+  const numberWords: Record<string, number> = {
+    'two': 2, 'three': 3, 'four': 4, 'five': 5, 'six': 6,
+    'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10
+  };
+
+  for (const pattern of partySizePatterns) {
+    const match = message.match(pattern);
+    if (match) {
+      const value = match[1].toLowerCase();
+      extracted.partySize = numberWords[value] || parseInt(value, 10);
+      break;
+    }
+  }
+
+  // Parse dietary restrictions
+  const dietaryPatterns = [
+    { pattern: /\b(no|none|no dietary|no restrictions|no dietary restrictions)\b/i, value: 'none' },
+    { pattern: /\bvegetarian\b/i, value: 'Vegetarian' },
+    { pattern: /\bvegan\b/i, value: 'Vegan' },
+    { pattern: /\bgluten[\s-]?free\b/i, value: 'Gluten-free' },
+    { pattern: /\bhalal\b/i, value: 'Halal' },
+    { pattern: /\bkosher\b/i, value: 'Kosher' },
+    { pattern: /\bnut[\s-]?(free|allergy)\b/i, value: 'Nut allergy' },
+    { pattern: /\bdairy[\s-]?free\b/i, value: 'Dairy-free' },
+  ];
+
+  // Only parse dietary if we already have party size (it's the next question)
+  if (currentContext?.partySize || extracted.partySize) {
+    for (const { pattern, value } of dietaryPatterns) {
+      if (pattern.test(message)) {
+        extracted.dietaryRestrictions = value;
+        break;
+      }
+    }
+  }
+
+  // Parse date
+  const datePatterns = [
+    { pattern: /\btonight\b/i, value: 'Tonight' },
+    { pattern: /\btomorrow\b/i, value: 'Tomorrow' },
+    { pattern: /\btoday\b/i, value: 'Today' },
+    { pattern: /\bthis weekend\b/i, value: 'This weekend' },
+    { pattern: /\bnext (monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i, value: (m: RegExpMatchArray) => `Next ${m[1]}` },
+    { pattern: /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i, value: (m: RegExpMatchArray) => m[1].charAt(0).toUpperCase() + m[1].slice(1) },
+  ];
+
+  // Only parse date if we have dietary info (it's the next question)
+  if (currentContext?.dietaryRestrictions || extracted.dietaryRestrictions) {
+    for (const { pattern, value } of datePatterns) {
+      const match = message.match(pattern);
+      if (match) {
+        extracted.date = typeof value === 'function' ? value(match) : value;
+        break;
+      }
+    }
+  }
+
+  // Parse time
+  const timePatterns = [
+    /\b(\d{1,2}):(\d{2})\s*(am|pm)\b/i,                  // "7:30 PM"
+    /\b(\d{1,2})\s*(am|pm)\b/i,                          // "7 PM"
+    /\b(\d{1,2}):(\d{2})\b/,                             // "19:30"
+    /\baround\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/i,   // "around 7", "around 7:30 PM"
+  ];
+
+  // Only parse time if we have date (it's the next question)
+  if (currentContext?.date || extracted.date) {
+    for (const pattern of timePatterns) {
+      const match = message.match(pattern);
+      if (match) {
+        let hour = parseInt(match[1], 10);
+        const minutes = match[2] ? match[2] : '00';
+        const ampm = match[3]?.toUpperCase() || (hour < 12 ? 'PM' : 'AM'); // Default to PM for restaurant times
+
+        if (ampm === 'PM' && hour < 12) hour += 0; // Keep as-is for display
+        extracted.time = `${hour}:${minutes} ${ampm}`;
+        break;
+      }
+    }
+  }
+
+  return extracted;
+}
+
+function getSystemPrompt(bookingContext?: BookingContextFromClient): string {
   const now = new Date();
   const options: Intl.DateTimeFormatOptions = {
     weekday: 'long',
@@ -230,6 +349,46 @@ function getSystemPrompt(): string {
     timeZone: 'America/Los_Angeles'
   };
   const currentDateTime = now.toLocaleString('en-US', options);
+
+  // Build explicit booking state section if in booking flow
+  let bookingStateSection = '';
+  if (bookingContext?.isInBookingFlow && bookingContext?.restaurant) {
+    const collected: string[] = [];
+    const missing: string[] = [];
+
+    if (bookingContext.partySize) {
+      collected.push(`party_size: ${bookingContext.partySize} people`);
+    } else {
+      missing.push('party_size');
+    }
+
+    if (bookingContext.dietaryRestrictions) {
+      collected.push(`dietary_restrictions: ${bookingContext.dietaryRestrictions}`);
+    } else {
+      missing.push('dietary_restrictions');
+    }
+
+    if (bookingContext.date) {
+      collected.push(`date: ${bookingContext.date}`);
+    } else {
+      missing.push('date');
+    }
+
+    if (bookingContext.time) {
+      collected.push(`time: ${bookingContext.time}`);
+    } else {
+      missing.push('time');
+    }
+
+    bookingStateSection = `
+
+CURRENT BOOKING SESSION (ACTIVE):
+- Restaurant: ${bookingContext.restaurant.name}
+- Already collected: ${collected.length > 0 ? collected.join(', ') : 'nothing yet'}
+- Still need: ${missing.length > 0 ? missing.join(', ') : 'nothing - ready to confirm!'}
+
+CRITICAL: You are in an ACTIVE booking session. DO NOT ask for information that has already been collected (listed above). Only ask for the NEXT missing item. Call collect_booking_info with ALL collected data plus any new info from the user's message.`;
+  }
 
   return `You are Reserva, an intelligent dining concierge powered by Google. You help users discover restaurants and make reservations seamlessly.
 
@@ -301,7 +460,7 @@ Once a user starts booking a restaurant (says "book X" or clicks to book), you M
 
 ONLY use collect_booking_info during booking. Restaurant cards should NOT appear during booking - only quick reply buttons and booking summary.
 
-Remember: You're not just searching, you're curating an experience. Every recommendation should feel personal and considered.`;
+Remember: You're not just searching, you're curating an experience. Every recommendation should feel personal and considered.${bookingStateSection}`;
 }
 
 // Store for caching restaurants from Places API during the session
@@ -788,15 +947,47 @@ function isBookingFlowActive(messages: Array<{ role: string; content: string }>)
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages } = await request.json();
+    const { messages, bookingContext: clientBookingContext } = await request.json();
 
-    // Detect if we're in an active booking flow
-    const inBookingFlow = isBookingFlowActive(messages);
+    // Use explicit booking state from client instead of fragile regex detection
+    // Falls back to regex detection only if client doesn't send booking context
+    const inBookingFlow = clientBookingContext?.isInBookingFlow ?? isBookingFlowActive(messages);
+
+    // Parse the user's latest message to extract any booking info
+    const lastUserMessage = messages[messages.length - 1]?.content || '';
+    const parsedFromMessage = inBookingFlow ? parseBookingInfoFromMessage(lastUserMessage, clientBookingContext) : {};
+
+    // Merge client context with parsed info from message (parsed takes precedence)
+    const bookingContext: BookingContextFromClient | undefined = clientBookingContext ? {
+      ...clientBookingContext,
+      partySize: parsedFromMessage.partySize ?? clientBookingContext.partySize,
+      dietaryRestrictions: parsedFromMessage.dietaryRestrictions ?? clientBookingContext.dietaryRestrictions,
+      date: parsedFromMessage.date ?? clientBookingContext.date,
+      time: parsedFromMessage.time ?? clientBookingContext.time,
+    } : undefined;
+
+    console.log('[Booking State] From client:', {
+      isInBookingFlow: clientBookingContext?.isInBookingFlow,
+      restaurant: clientBookingContext?.restaurant?.name,
+      partySize: clientBookingContext?.partySize,
+      dietaryRestrictions: clientBookingContext?.dietaryRestrictions,
+      date: clientBookingContext?.date,
+      time: clientBookingContext?.time,
+    });
+
+    console.log('[Booking State] Parsed from message:', parsedFromMessage);
+    console.log('[Booking State] Merged context:', {
+      restaurant: bookingContext?.restaurant?.name,
+      partySize: bookingContext?.partySize,
+      dietaryRestrictions: bookingContext?.dietaryRestrictions,
+      date: bookingContext?.date,
+      time: bookingContext?.time,
+    });
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-2.5-flash',
       tools,
-      systemInstruction: getSystemPrompt(),
+      systemInstruction: getSystemPrompt(bookingContext),
     });
 
     const history = messages.slice(0, -1).map((msg: { role: string; content: string }) => ({
@@ -818,7 +1009,9 @@ export async function POST(request: NextRequest) {
     let mapUpdate = null;
     let modifiedReservation = null;
     let quickReplies: Array<{ label: string; value: string; action?: string }> | null = null;
-    let bookingSummary: { restaurant: Restaurant; partySize: number; date: string; time: string; depositAmount?: number } | null = null;
+    let bookingSummary: { restaurant: Restaurant; partySize: number; date: string; time: string; depositAmount?: number; dietaryRestrictions?: string | null } | null = null;
+    // Separate field for partial booking state sync (doesn't show summary card)
+    let collectedBookingData: { restaurant: Restaurant; partySize: number | null; dietaryRestrictions: string | null; date: string | null; time: string | null } | null = null;
 
     // Check for function calls - handle both property access methods
     let funcCalls = response.functionCalls?.() || [];
@@ -869,12 +1062,51 @@ export async function POST(request: NextRequest) {
         }
 
         if (call.name === 'collect_booking_info' && toolResult && typeof toolResult === 'object') {
-          const bookingResult = toolResult as { quick_replies?: Array<{ label: string; value: string; action?: string }>; booking_summary?: { restaurant: Restaurant; partySize: number; date: string; time: string; depositAmount?: number } };
+          const bookingResult = toolResult as {
+            quick_replies?: Array<{ label: string; value: string; action?: string }>;
+            booking_summary?: { restaurant: Restaurant; partySize: number; date: string; time: string; depositAmount?: number };
+            collected?: { party_size: number | null; dietary_restrictions: string | null; date: string | null; time: string | null };
+            restaurant_name?: string;
+            restaurant_id?: string;
+          };
           if (bookingResult.quick_replies) {
             quickReplies = bookingResult.quick_replies;
           }
           if (bookingResult.booking_summary) {
             bookingSummary = bookingResult.booking_summary;
+          }
+          // Also extract collected data for partial booking state sync (separate from summary)
+          if (bookingResult.collected && !bookingResult.booking_summary) {
+            // Find the restaurant object from cache or mock data
+            let restaurant: Restaurant | undefined;
+            const restaurantNameLower = bookingResult.restaurant_name?.toLowerCase();
+            if (bookingResult.restaurant_id) {
+              restaurant = cachedRestaurants.get(bookingResult.restaurant_id);
+            }
+            if (!restaurant && restaurantNameLower) {
+              for (const [, cached] of cachedRestaurants) {
+                if (cached.name.toLowerCase().includes(restaurantNameLower)) {
+                  restaurant = cached;
+                  break;
+                }
+              }
+            }
+            if (!restaurant && restaurantNameLower) {
+              restaurant = MOCK_RESTAURANTS.find((r) =>
+                r.name.toLowerCase().includes(restaurantNameLower)
+              );
+            }
+
+            // Store collected data for state sync (returned separately from bookingSummary)
+            if (restaurant) {
+              collectedBookingData = {
+                restaurant,
+                partySize: bookingResult.collected.party_size,
+                dietaryRestrictions: bookingResult.collected.dietary_restrictions,
+                date: bookingResult.collected.date,
+                time: bookingResult.collected.time,
+              };
+            }
           }
         }
 
@@ -939,8 +1171,128 @@ export async function POST(request: NextRequest) {
             { label: '6 people', value: '6 people' },
           ];
         }
+      } else if (inBookingFlow && bookingContext?.restaurant) {
+        // We have booking context - continue the flow instead of generic fallback
+        // Use the MERGED context which includes info parsed from the user's message
+        const restaurant = bookingContext.restaurant;
+        const missing: string[] = [];
+        if (!bookingContext.partySize) missing.push('party size');
+        if (!bookingContext.dietaryRestrictions) missing.push('dietary restrictions');
+        if (!bookingContext.date) missing.push('date');
+        if (!bookingContext.time) missing.push('time');
+
+        console.log('[Fallback] Booking context after parsing:', {
+          restaurant: restaurant.name,
+          partySize: bookingContext.partySize,
+          dietaryRestrictions: bookingContext.dietaryRestrictions,
+          date: bookingContext.date,
+          time: bookingContext.time,
+          missing,
+        });
+
+        // Find full restaurant object for collectedBookingData
+        let fullRestaurant: Restaurant | undefined;
+        if (restaurant.id) {
+          fullRestaurant = cachedRestaurants.get(restaurant.id);
+        }
+        if (!fullRestaurant && restaurant.name) {
+          const nameLower = restaurant.name.toLowerCase();
+          for (const [, cached] of cachedRestaurants) {
+            if (cached.name.toLowerCase().includes(nameLower)) {
+              fullRestaurant = cached;
+              break;
+            }
+          }
+        }
+        if (!fullRestaurant && restaurant.name) {
+          fullRestaurant = MOCK_RESTAURANTS.find((r) =>
+            r.name.toLowerCase().includes(restaurant.name.toLowerCase())
+          );
+        }
+
+        if (missing.length > 0) {
+          const nextQuestion = missing[0];
+          if (nextQuestion === 'party size') {
+            text = `Great! How many people will be joining for your reservation at **${restaurant.name}**?`;
+            quickReplies = [
+              { label: '2 people', value: '2 people' },
+              { label: '4 people', value: '4 people' },
+              { label: '6 people', value: '6 people' },
+            ];
+          } else if (nextQuestion === 'dietary restrictions') {
+            text = `Perfect, party of ${bookingContext.partySize}! Any dietary restrictions I should note?`;
+            quickReplies = [
+              { label: 'None', value: 'No dietary restrictions' },
+              { label: 'Vegetarian', value: 'Vegetarian' },
+              { label: 'Vegan', value: 'Vegan' },
+              { label: 'Gluten-free', value: 'Gluten-free' },
+            ];
+          } else if (nextQuestion === 'date') {
+            text = `Great! When would you like to dine at **${restaurant.name}**?`;
+            quickReplies = [
+              { label: 'Tonight', value: 'Tonight' },
+              { label: 'Tomorrow', value: 'Tomorrow' },
+              { label: 'This weekend', value: 'This weekend' },
+            ];
+          } else if (nextQuestion === 'time') {
+            text = `What time works for you on ${bookingContext.date}?`;
+            quickReplies = [
+              { label: '6:00 PM', value: '6:00 PM' },
+              { label: '7:00 PM', value: '7:00 PM' },
+              { label: '7:30 PM', value: '7:30 PM' },
+              { label: '8:00 PM', value: '8:00 PM' },
+            ];
+          }
+
+          // Set collectedBookingData so frontend can sync state
+          if (fullRestaurant) {
+            collectedBookingData = {
+              restaurant: fullRestaurant,
+              partySize: bookingContext.partySize ?? null,
+              dietaryRestrictions: bookingContext.dietaryRestrictions ?? null,
+              date: bookingContext.date ?? null,
+              time: bookingContext.time ?? null,
+            };
+          }
+        } else {
+          // All info collected - show summary
+          if (fullRestaurant) {
+            // Calculate deposit
+            let depositAmount = 0;
+            if (fullRestaurant.depositPolicy && bookingContext.partySize) {
+              if (fullRestaurant.depositPolicy.type === 'per_person') {
+                depositAmount = fullRestaurant.depositPolicy.amount * bookingContext.partySize;
+              } else if (fullRestaurant.depositPolicy.type === 'flat') {
+                if (!fullRestaurant.depositPolicy.minPartySize || bookingContext.partySize >= fullRestaurant.depositPolicy.minPartySize) {
+                  depositAmount = fullRestaurant.depositPolicy.amount;
+                }
+              }
+            }
+
+            text = `Here's your booking summary for **${restaurant.name}**:`;
+            quickReplies = [
+              { label: depositAmount > 0 ? `Confirm & Pay $${depositAmount}` : 'Confirm Reservation', value: 'confirm', action: 'confirm_booking' },
+              { label: 'Change details', value: 'change', action: 'change_details' },
+            ];
+
+            bookingSummary = {
+              restaurant: fullRestaurant,
+              partySize: bookingContext.partySize!,
+              dietaryRestrictions: bookingContext.dietaryRestrictions,
+              date: bookingContext.date!,
+              time: bookingContext.time!,
+              depositAmount,
+            };
+          } else {
+            text = `I have all the details for your booking at **${restaurant.name}**. Ready to confirm?`;
+            quickReplies = [
+              { label: 'Confirm Reservation', value: 'confirm', action: 'confirm_booking' },
+              { label: 'Change details', value: 'change', action: 'change_details' },
+            ];
+          }
+        }
       } else {
-        // Generic fallback
+        // Generic fallback only when we truly have no context
         text = "I'm ready to help! What would you like to do?";
       }
 
@@ -955,6 +1307,7 @@ export async function POST(request: NextRequest) {
       modifiedReservation,
       quickReplies,
       bookingSummary,
+      collectedBookingData, // For state sync during booking flow
     });
   } catch (error) {
     console.error('Chat API error:', error);
